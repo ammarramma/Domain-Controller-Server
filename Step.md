@@ -276,7 +276,7 @@ Langkah ini fokus pada instalasi role DNS serta pembuatan Reverse Lookup Zone da
     ```PowerShell
     DnsCmd /recordAdd a3n4.com www A 192.168.56.10
 
-    Add-DnsServerResourceRecordA -Name "www" -ZoneName "a3n4.com" -Ipv4Address "192.168.56.10"
+    Add-DnsServerResourceRecordA -Name "www" -ZoneName "a3n4.com" -Ipv4Address "192.168.56.10
     ```
     Penjelasan:     
                 - `Add-DnsServerResourceRecordA`: Fungsi utama untuk menambah rekaman alamat IPv4 (Record A).   
@@ -347,12 +347,13 @@ DNS & DHCP = Jalur kabel dan pemberian nomor rumah agar bisa saling panggil.
 Join Domain = Aturan hukum dan sistem kependudukan agar semuanya patuh pada satu pimpinan (Server).
 
 ## Steps Create
-1. Login Windows Client
+1. Login Windows Client (Pastikan Windows Pro)
 2. Klik win+r lalu masukkan `sysdm.cpl` untuk masuk ke system properties
 3. pilih change dibagian bawah kanan
-4. Klik ok maka muncul window untuk meminta masukkan credential
-5. Masukkan username dan password domain untuk memberi izin, lalu klik ok
-6. Restart Client
+4. Pilih Domain lalu masukkan nama domainnya
+5. Klik ok maka muncul window untuk meminta masukkan credential
+6. Masukkan username dan password domain untuk memberi izin, lalu klik ok
+7. Restart Client
 
 ## Steps Verification
 1. Login Windows Client
@@ -362,63 +363,331 @@ Join Domain = Aturan hukum dan sistem kependudukan agar semuanya patuh pada satu
 5. Pastikan client sudah menunjuk ip address ke dhcp dan dns server ke domain
 
 # User & Group
+## Function
+Jika Domain adalah sebuah kantor besar, maka:
+
+1. Organizational Unit (OU): Ibarat sebuah Gedung atau Ruangan. Gunanya untuk merapikan database AD agar tidak berantakan. Tanpa OU, semua user akan tercampur di satu folder besar.
+
+2. User: Ibarat Kunci Masuk. Setiap karyawan punya kunci (username/password) unik. Ini memastikan kita tahu "siapa melakukan apa" di dalam jaringan.
+
+3. Group: Ibarat Akses Khusus. Daripada memberikan izin satu per satu ke 100 orang, kita cukup masukkan 100 orang itu ke kelompok "Finance", lalu kelompok "Finance" kita beri akses ke folder gaji. Jauh lebih cepat dan efisien.
+
 ## Steps Create
+1. Membuat Organizational Unit (OU)
+
+    ```PowerShell
+    New-AdOrganizationalUnit -Name "a3n4_Staff" -Path "DC=a3n4, DC=com"
+    ```
+    * Penjelasan: Membuat wadah bernama a3n4_Staff.
+
+    * Parameter: -Path menjelaskan di mana wadah ini berada (di dalam root domain a3n4.com).
+
+2. Membuat Security Group
+
+    ```PowerShell
+    # Contoh
+    New-AdGroup -Name "HR_Staff" -GroupScope Global -Path "OU=a3n4_Staff, DC=a3n4, DC=com" -GroupCategory Security
+
+    # Isi
+    New-AdGroup -Name "All_Staff" -GroupScope Global -Path "OU=a3n4_Staff, DC=a3n4, DC=com" -GroupCategory Security
+    New-AdGroup -Name "Finance_Staff" -GroupScope Global -Path "OU=a3n4_Staff, DC=a3n4, DC=com" -GroupCategory Security
+    New-AdGroup -Name "HR_Staff" -GroupScope Global -Path "OU=a3n4_Staff, DC=a3n4, DC=com" -GroupCategory Security
+    New-AdGroup -Name "Marketing_Staff" -GroupScope Global -Path "OU=a3n4_Staff, DC=a3n4, DC=com" -GroupCategory Security
+    ```
+    * Penjelasan: Membuat kelompok departemen.
+
+    * Parameter: -GroupScope Global berarti grup ini bisa digunakan di seluruh domain, dan -GroupCategory Security berarti grup ini bisa digunakan untuk mengatur hak akses folder/file.
+
+3. Membuat Akun User
+
+    ```PowerShell
+    # Contoh 
+    New-ADUser -Name "Ammar" -SamAccountName "Ammar" -AccountPassword (...) -Enabled $true
+
+    # Isi
+    # Ammar
+    New-ADUser -Name "Ammar" -GivenName "Ammar" -Surname "" -SamAccountName "Ammar" -UserPrincipalName "Ammar@a3n4.com" -Path "OU=a3n4_Staff,DC=a3n4,DC=com" -AccountPassword (ConvertTo-SecureString "##ammarTi2b" -AsPlainText -Force) -Enabled $true
+
+    #Nailis Saputri
+    New-AdUser -Name "Nailis Saputri" -GivenName "Nailis" -Surname "Saputri" -SamAccountName "NailisSaputri" -UserPrincipalName "NailisSaputri@a3n4.com" -Path "OU=a3n4_Staff, DC=a3n4, DC=com" -AccountPassword (ConvertTo-SecureString "##nailisTi2b" -AsPlainText -Force) -Enabled $true
+
+    # Dhiyaul Atha
+    New-ADUser -Name "Dhiyaul Atha" -GivenName "Dhiyaul" -Surname "Atha" -SamAccountName "DhiyaulAtha" -UserPrincipalName "DhiyaulAtha@a3n4.com" -Path "OU=a3n4_Staff,DC=a3n4,DC=com" -AccountPassword (ConvertTo-SecureString "##athaTi2b" -AsPlainText -Force) -Enabled $true
+
+    # Naiza Fitri
+    New-ADUser -Name "Naiza Fitri" -GivenName "Naiza" -Surname "Fitri" -SamAccountName "NaizaFitri" -UserPrincipalName "NaizaFitri@a3n4.com" -Path "OU=a3n4_Staff,DC=a3n4,DC=com" -AccountPassword (ConvertTo-SecureString "##naizaTi2b" -AsPlainText -Force) -Enabled $true
+
+    # Nayla Mutia
+    New-ADUser -Name "Nayla Mutia" -GivenName "Nayla" -Surname "Mutia" -SamAccountName "NaylaMutia" -UserPrincipalName "NaylaMutia@a3n4.com" -Path "OU=a3n4_Staff,DC=a3n4,DC=com" -AccountPassword (ConvertTo-SecureString "##naylaTi2b" -AsPlainText -Force) -Enabled $true
+
+    # Nikmal Wakil
+    New-ADUser -Name "Nikmal Wakil" -GivenName "Nikmal" -Surname "Wakil" -SamAccountName "NikmalWakil" -UserPrincipalName "NikmalWakil@a3n4.com" -Path "OU=a3n4_Staff,DC=a3n4,DC=com" -AccountPassword (ConvertTo-SecureString "##nikmalTi2b" -AsPlainText -Force) -Enabled $true
+
+    # Arini Safitri
+    New-ADUser -Name "Arini Safitri" -GivenName "Arini" -Surname "Safitri" -SamAccountName "AriniSafitri" -UserPrincipalName "AriniSafitri@a3n4.com" -Path "OU=a3n4_Staff,DC=a3n4,DC=com" -AccountPassword (ConvertTo-SecureString "##ariniTi2b" -AsPlainText -Force) -Enabled $true
+    ```
+    * Penjelasan: Mendaftarkan individu ke dalam sistem.
+
+    * Parameter Penting:
+
+        * -SamAccountName: Nama yang digunakan untuk login (misal: Ammar).
+
+        * -UserPrincipalName: Format login email (Ammar@a3n4.com).
+
+        * -AccountPassword: Memberikan password awal yang sudah di-enkripsi.
+
+        * -Enabled $true: Memastikan akun langsung aktif dan bisa digunakan untuk login.
+
+4. Aktivasi User (Opsional)
+
+    ```PowerShell
+    # Jika tidak memakai -Enabled $true maka harus mengaktifkan user secara manual dengan perintah berikut:
+    Enable-ADAccount -Identity "Ammar" 
+    # Atau untuk seluruh user dengan satu command:
+    Get-ADUser -Filter * -SearchBase "OU=a3n4_Staff,DC=a3n4,DC=com" | Enable-ADAccount
+    ```
+    Penjelasan: Perintah borongan untuk mengaktifkan semua user yang ada di dalam OU tersebut jika saat pembuatan lupa menambahkan -Enabled $true.
+
+5. Memasukkan User ke Group (Membership)
+
+    ```PowerShell
+    Add-AdGroupMember -Identity "Nama_Group" -Members "Nama_User"
+    ```
+    Penjelasan: Menghubungkan user dengan departemennya. Setelah ini dijalankan, user tersebut otomatis mendapatkan semua hak akses yang dimiliki oleh grup tersebut.
+
+## Verification Step
+Verifikasi Anggota Group
+```PowerShell
+Get-ADGroupMember -Identity "All_Staff"
+```
+Fungsi: Menampilkan daftar siapa saja yang sudah berhasil masuk ke dalam grup All_Staff. Jika nama-nama user yang kamu buat tadi muncul di sini, berarti konfigurasi berhasil.
+
+Tips Wit: Ingat, memberikan password yang sama ke semua user (##ammarTi2b, dll) itu memudahkan saat praktik, tapi di dunia nyata, biasanya kita pakai opsi ChangePasswordAtLogon supaya mereka ganti password sendiri saat pertama kali masuk!
+Contoh:
 ```powershell
-# Membuat Organisasi
-New-AdOrganizationalUnit -Name "a3n4_Staff" -Path "DC=a3n4, DC=com"
+New-ADUser -Name "Arini Safitri" -GivenName "Arini" -Surname "Safitri" -SamAccountName "AriniSafitri" -UserPrincipalName "AriniSafitri@a3n4.com" -Path "OU=a3n4_Staff,DC=a3n4,DC=com" -AccountPassword (ConvertTo-SecureString "##ariniTi2b" -AsPlainText -Force) -Enabled $true -ChangePasswordAtLogon $true
+```
+# IIS
+## Function
+### IIS (Internet Information Services) - Membangun Toko Online
+**Filosofi**: Setelah semua infrastruktur siap, sekarang saatnya kita membuka "toko online" agar dunia bisa mengakses layanan yang kita tawarkan.
+**Kenapa ini penting?** Tanpa IIS, server kamu hanyalah komputer biasa. Dengan IIS, kamu bisa membuat website, aplikasi web, atau layanan online yang bisa diakses dari mana saja.
 
-# Membuat Group
-New-AdGroup -Name "All_Staff" -GroupScope Global -Path "OU=a3n4_Staff, DC=a3n4, DC=com" -GroupCategory Security
-New-AdGroup -Name "HR_Staff" -GroupScope Global -Path "OU=a3n4_Staff, DC=a3n4, DC=com" -GroupCategory Security
-New-AdGroup -Name "Marketing_Staff" -GroupScope Global -Path "OU=a3n4_Staff, DC=a3n4, DC=com" -GroupCategory Security
-New-AdGroup -Name "Finance_Staff" -GroupScope Global -Path "OU=a3n4_Staff, DC=a3n4, DC=com" -GroupCategory Security
+## Steps Create
+1. Instalasi Role IIS
 
-# Membuat User
-# Ammar
-New-ADUser -Name "Ammar" -GivenName "Ammar" -Surname "Ammar" -SamAccountName "Ammar" -UserPrincipalName "Ammar@a3n4.com" -Path "OU=a3n4_Staff,DC=a3n4,DC=com" -AccountPassword (ConvertTo-SecureString "##ammarTi2b" -AsPlainText -Force) -Enabled $true
+    ```PowerShell
+    Install-WindowsFeature -Name Web-Server -IncludeManagementTools
+    ```
+    Penjelasan: Mengaktifkan layanan IIS pada Windows Server. Parameter -IncludeManagementTools memastikan kamu mendapatkan akses ke IIS Manager (GUI) dan modul PowerShell terkait.
 
-#Nailis Saputri
-New-AdUser -Name "Nailis Saputri" -GivenName "Nailis" -Surname "Saputri" -SamAccountName "NailisSaputri" -UserPrincipalName "NailisSaputri@a3n4.com" -Path "OU=a3n4_Staff, DC=a3n4, DC=com" -AccountPassword (ConvertTo-SecureString "##nailisTi2b" -AsPlainText -Force) -Enabled $true
+2. Membuat Folder untuk Website
+    ```Powershell
+    New-Item -Path "C:\inetpub\a3n4web" -ItemType directory
+    ```
+    Penjelasan: 
 
-# Dhiyaul Atha
-New-ADUser -Name "Dhiyaul Atha" -GivenName "Dhiyaul" -Surname "Atha" -SamAccountName "DhiyaulAtha" -UserPrincipalName "DhiyaulAtha@a3n4.com" -Path "OU=a3n4_Staff,DC=a3n4,DC=com" -AccountPassword (ConvertTo-SecureString "##athaTi2b" -AsPlainText -Force) -Enabled $true
+3. Membuat Website Baru
+    ```Powershell
+    New-Website -Name "a3n4web" -Port 80 -IpAddress "*" -HostHeader "a3n4.com" -PhysicalPath "C:\inetpub\a3n4web"
+    ```
+    Penjelasan:
 
-# Naiza Fitri
-New-ADUser -Name "Naiza Fitri" -GivenName "Naiza" -Surname "Fitri" -SamAccountName "NaizaFitri" -UserPrincipalName "NaizaFitri@a3n4.com" -Path "OU=a3n4_Staff,DC=a3n4,DC=com" -AccountPassword (ConvertTo-SecureString "##naizaTi2b" -AsPlainText -Force) -Enabled $true
 
-# Nayla Mutia
-New-ADUser -Name "Nayla Mutia" -GivenName "Nayla" -Surname "Mutia" -SamAccountName "NaylaMutia" -UserPrincipalName "NaylaMutia@a3n4.com" -Path "OU=a3n4_Staff,DC=a3n4,DC=com" -AccountPassword (ConvertTo-SecureString "##naylaTi2b" -AsPlainText -Force) -Enabled $true
+```Powershell
+Copy-Item -Path "" -Destination "C:\inetpub\a3n4web" -Recurse
 
-# Nikmal Wakil
-New-ADUser -Name "Nikmal Wakil" -GivenName "Nikmal" -Surname "Wakil" -SamAccountName "NikmalWakil" -UserPrincipalName "NikmalWakil@a3n4.com" -Path "OU=a3n4_Staff,DC=a3n4,DC=com" -AccountPassword (ConvertTo-SecureString "##nikmalTi2b" -AsPlainText -Force) -Enabled $true
+Install-WindowsFeature Web-Static-Content
 
-# Arini Safitri
-New-ADUser -Name "Arini Safitri" -GivenName "Arini" -Surname "Safitri" -SamAccountName "AriniSafitri" -UserPrincipalName "AriniSafitri@a3n4.com" -Path "OU=a3n4_Staff,DC=a3n4,DC=com" -AccountPassword (ConvertTo-SecureString "##ariniTi2b" -AsPlainText -Force) -Enabled $true
+New-SelfSignedCertificate -DnsName "a3n4.com" -CertStoreLocation "cert:\LocalMachine\My"
 
-# Jika tidak memakai -Enabled $true maka harus mengaktifkan user secara manual dengan perintah berikut:
-Enable-ADAccount -Identity "Ammar" 
-# Atau untuk seluruh user dengan satu command:
-Get-ADUser -Filter * -SearchBase "OU=a3n4_Staff,DC=a3n4,DC=com" | Enable-ADAccount
+Import-Module WebAdministration
 
-#Memasukkan User kedalam group
-Add-AdGroupMember -Identity "Nama_Group" -Members "Nama_Member1", "Nama, Member2"
+New-WebBinding -Name "a3n4web" -Protocol https -port 443 -IpAddress "*" -HostHeader "a3n4.com"
+
+Get-Item "cert:\LocalMachine\My\<ThumbPrint>" | New-Item "IIS:SslBindings\0.0.0.0!443!a3n4.com"
+
+```
+## Steps Verification
+1. Login Client
+2. Ketik http://a3n4.com untuk masuk ke IIS web
+3. Maka akan berhasil ke web
+4. Ketik https://a3n4.com untuk masuk ke IIS Certificate
+5. Maka akan tampil "Your Connection Isn't Private"
+6. Klik Advanced lalu continue to a3n4.com (unsafe)
+7. Maka berhasil masuk ke IISC
+
+
+# Remote Desktop
+## Function
+
+
+## Steps Create
+### Server
+1. Masuk ke SConfig
+2. Pilih 7
+3. Pilih E untuk Enabled Remote Dekstop
+4. Pilih 1 untuk more secure
+5. Enter dan pilih 13
+
+### Client
+1. Login Client
+2. Buka Search bar atau win+r
+3. Cari Remote Dekstop Connection atau mstsc
+4. Pada Window Remote Dekstop
+5. Isi Nama Computer a3n4.com
+6. Pada jendela credential masukkan password user 
+7. Muncul Warning remote computer cannot be verified klik ok (Karna ini server buatan sendiri jadi aman)
+
+## Steps Verification
+
+
+# ADFS
+## Steps Create
+```Powershell
+Install-WindowsFeature ADFS-Federation -IncludeManagementTools
+
+Add-DnsServerResourceRecordA -Name "adfs" -ZoneName "a3n4.com" -Ipv4Address 192.168.56.10
+
+New-SelfSignedCertificate -DnsName "adfs.a3n4.com" -CertStoreLocation "cert:\LocalMachine\My"
+
+Add-KdsRootKey -EffectiveTime ((Get-Date).AddDays(1))
+
+$pass = "2025" | ConvertTo-SecureString -AsPlainText -Force
+$cred = New-Object System.Management.Automation.PSCredential ("A3N4\administrator", $pass)
+
+Install-ADFSFarm -CertificateThumbprint "8A5421340313C07AA2017F76F55984BAC754C422" -FederationServiceName "adfs.a3n4.com" -FederationServiceDisplayName "A3N4 Federation Service" -ServiceAccountCredential $cred
+
+# Masukkan username akun dan password yang akan digunakan lalu klik ok
+
+Set-ADFSProperties -EnableIdpInitiatedSignOnPage $true
+
+Get-Service ADFSSRV
+
+### PLUS Identity
+New-AdfsWebTheme -Name "TemaBaru" -SourceName "Default"
+
+Set-AdfsWebTheme -TargetName "TemaBaru" -Illustration @{path="Z:\wall_a3n4.jpg"}
+
+Set-AdfsWebTheme -TargetName "TemaBaru" -Logo @{path="Z:\logo_a3n4.png"}
+
+Set-AdfsWebConfig -ActiveThemeName "TemaBaru"
+```
+
+### Client
+1. Login Client
+2. Pada Browser Masukkan https://adfs.a3n4.com/adfs/ls/IdpInitiatedSignOn.aspx
+3. Tampil "Your connection is not private"
+4. Pilih advance dan continue to the web
+5. Maka akan tampil halaman dari web adfs
+6. Klik Sign in untuk login
+7. Masukkan Username dan password lalu sign in
+
+
+
+# DFS
+## Steps Install
+```Powershell
+Install-WindowsFeature Fs-Dfs-NameSpace -IncludeManagementTools
+
+New-Item -Path "C:\DFSRoots\a3n4_shared" -ItemType Directory
+
+New-SmbShare -Name "DFSa3n4" -Path "C:\DFSRoots\a3n4_shared" -FullAccess "a3n4\Administrator"
+
+New-Dfsnroot -Type domainv2 -Path "\\a3n4.com\data_a3n4" -TargetPath "\\a3n4_server\DFSa3n4"
+
+New-Item -ItemType Directory -Path "C:\Shared"
+
+New-SmbShare -Name "data_share" -Path "C:\Shared" -FullAccess "a3n4\Administrator"
+
+New-Item -ItemType Directory -Path "C:\Shared\AllStaff"
+New-Item -ItemType Directory -Path "C:\Shared\HRStaff"
+New-Item -ItemType Directory -Path "C:\Shared\MarketingStaff"
+New-Item -ItemType Directory -Path "C:\Shared\FinanceStaff"
+
+Icacls "C:\Shared\AllStaff"
+Icacls "C:\Shared\AllStaff" /inheritance:r
+Icacls "C:\Shared\AllStaff" /grant "a3n4\AllStaff:(OI)(CI)M" "a3n4\Administrator:(OI)(CI)F"
+Icacls "C:\Shared\AllStaff"
+
+Icacls "C:\Shared\HRStaff" 
+Icacls "C:\Shared\HRStaff" /inheritance:r
+Icacls "C:\Shared\HRStaff" /grant "a3n4\HRStaff:(OI)(CI)M" "a3n4\Administrator:(OI)(CI)F"
+Icacls "C:\Shared\HRStaff"
+
+Icacls "C:\Shared\FinanceStaff"
+Icacls "C:\Shared\FinanceStaff" /inheritance:r
+Icacls "C:\Shared\FinanceStaff" /grant "a3n4\FinanceStaff:(OI)(CI)M" "a3n4\Administrator:(OI)(CI)F"
+Icacls "C:\Shared\FinanceStaff"
+
+Icacls "C:\Shared\MarketingStaff" /inheritance:r
+Icacls "C:\Shared\MarketingStaff" /grant "a3n4\MarketingStaff:(OI)(CI)M" "a3n4\Administrator:(OI)(CI)F"
+Icacls "C:\Shared\MarketingStaff"
+
+New-DfsnFolder -Path "\\a3n4.com\data_a3n4\AllStaff" -TargetPath "\\a3n4_server\data_share\AllStaff"
+New-DfsnFolder -Path "\\a3n4.com\data_a3n4\HRStaff" -TargetPath "\\a3n4_server\data_share\HRStaff"
+New-DfsnFolder -Path "\\a3n4.com\data_a3n4\MarketingStaff" -TargetPath "\\a3n4_share\data_a3n4\MarketingStaff"
+New-DfsnFolder -Path "\\a3n4.com\data_a3n4\FinanceStaff" -TargetPath "\\a3n4_server\data_share\FinanceStaff"
+
+Grant-SmbShareAccess -Name DFSa3n4 -Account "a3n4\All_Staff" -AccessRight Read -Force
+Grant-SmbShareAccess -Name DFSa3n4 -Account "a3n4\HR_Staff" -AccessRight Read -Force
+Grant-SmbShareAccess -Name DFSa3n4 -Account "a3n4\Finance_Staff" -AccessRight Read -Force
+Grant-SmbShareAccess -Name DFSa3n4 -Account "a3n4\Marketing_Staff" -AccessRight Read -Force
+
+Grant-SmbShareAccess -Name data_share -Account "a3n4\All_Staff" -AccessRight Change -Force
+Grant-SmbShareAccess -Name data_share -Account "a3n4\HR_Staff" -AccessRight Change -Force
+Grant-SmbShareAccess -Name data_share -Account "a3n4\Finance_Staff" -AccessRight Change -Force
+Grant-SmbShareAccess -Name data_share -Account "a3n4\Marketing_Staff" -AccessRight Change -Force
+
+Set-DfsnRoot -Path "\\a3n4\data_a3n4" -EnableAccessBasedEnumeration $true 
+
+takeown /f "C:\DFSRoots"
+
+Icacls "C:\DFSRoots" /setowner "NT AUTHORITY\SYSTEM" /T /C
+
+Icacls "C:\DFSRoots"
+
+takeown /f "C:\DFSRoots\a3n4_shared\AllStaff" /r /d y
+Icacls "C:\DFSRoots\a3n4_shared\AllStaff" /inheritance:r
+Icacls "C:\DFSRoots\a3n4_shared\AllStaff" /grant "a3n4\All_Staff:(OI)(CI)M"
+Icacls "C:\DFSRoots\a3n4_shared\AllStaff"
+
+takeown /f "C:\DFSRoots\a3n4_shared\HRStaff" /r /d y
+Icacls "C:\DFSRoots\a3n4_shared\HRStaff" /inheritance:r
+Icacls "C:\DFSRoots\a3n4_shared\HRStaff" /grant "a3n4\All_Staff:(OI)(CI)M"
+Icacls "C:\DFSRoots\a3n4_shared\HRStaff"
+
+takeown /f "C:\DFSRoots\a3n4_shared\MarketingStaff" /r /d y
+Icacls "C:\DFSRoots\a3n4_shared\MarketingStaff" /grant "a3n4\Marketing_Staff:(OI)(CI)M"
+Icacls "C:\DFSRoots\a3n4_shared\MarketingStaff"
+
+takeown /f "C:\DFSRoots\a3n4_shared\FinanceStaff" /r /d y
+Icacls "C:\DFSRoots\a3n4_shared\FinanceStaff" /grant "a3n4\Finance_Staff:(OI)(CI)M"
+Icacls "C:\DFSRoots\a3n4_shared\FinanceStaff"
+
 
 ```
 ## Verification Step
-```powershell
-Get-ADGroupMember -Identity "All_Staff"
+1. Login Client
+2. Klik kanan pada logo windows pilih run
+3. Ketik \\a3n4.com\data_a3n4
+4. Maka akan direct ke folder data_a3n4, yang menampilkan folder group yang dimasukin oleh user tsb.
+5. Pada Folder Group User tsb buatlah sebuah file
+6. Di Server masuk ke directory C:\Shared\<Folder_Group_user_sebelumnya>
+7. Maka akan tampil file yang telah dibuat oleh user tsb. 
+
+
+# FSRM
+## Steps Install
+```Powershell
+Install-WindowsFeature
 ```
-
-# IIS
-
-# DFS
-
-# ADFS
 
 # NTP
 
 # FTP
 
-# Remote Desktop
-
 # VPN
+
+
+# Mail Server
