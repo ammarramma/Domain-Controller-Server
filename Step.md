@@ -38,51 +38,22 @@ set-sconfig -autoLaunch $true
 **Kenapa harus ada ini?** Tanpa AD DS, komputer-komputer hanyalah individu yang asing satu sama lain. AD DS memberikan "identitas" resmi bagi user dan komputer.
 
 ## Steps Create
-Langkah ini digunakan untuk mengubah Windows Server biasa menjadi Domain Controller (DC) yang mengelola identitas terpusat.
-1. Instalasi Role AD DS
-
+```PowerShell
+Install-windowsfeature -name AD-Domain-Services -includeManagementTools
+Install-ADDSForest -domainName "A3N4.com" -domainNetBiosName "A3N4" -safeModeAdministratorPassword (Convertto-SecureString "Aclsdmin123" -asplaintext -force)
+```
+## Steps Remove
+1. Uninstall Role AD DS
     ```PowerShell
-    Install-windowsfeature -name AD-Domain-Services -includeManagementTools
+    Uninstall-WindowsFeature AD-Domain-Services -IncludeManagementTools
     ```
-    * Penjelasan: Mengunduh biner dan file sistem yang diperlukan untuk menjalankan layanan Active Directory.
-
-    * Parameter: -includeManagementTools memasang konsol administrasi seperti AD Users and Computers dan modul PowerShell AD agar server bisa dikelola setelah instalasi.
-
-2. Konfigurasi Forest Baru
-
-    ```PowerShell
-    Install-ADDSForest -domainName "A3N4.com" -domainNetBiosName "A3N4" -safeModeAdministratorPassword (Convertto-SecureString "Aclsdmin123" -asplaintext -force)
-    ```
-    * Penjelasan: Perintah ini melakukan "promosi" server menjadi Domain Controller pertama di dalam Forest baru.
-
-    * Parameter Penting:
-
-        * `-domainName`: Menentukan nama DNS domain (FQDN).
-
-        * `-domainNetBiosName`: Nama domain versi lama untuk kompatibilitas.
-
-        * `-safeModeAdministratorPassword`: Mengatur password untuk DSRM (Directory Services Restore Mode), yang digunakan untuk perbaikan jika database AD rusak.`
 
 ## Steps Verification
-Gunakan perintah ini setelah server melakukan restart otomatis untuk memastikan domain sudah aktif.
-
-1. Verifikasi Instalasi Fitur
-    ```PowerShell
-    Get-WindowsFeature AD-Domain-Services
-    ```
-    Fungsi: Memastikan bahwa status fitur sudah tercentang/terpasang ([X]) di sistem operasi.
-
-2. Verifikasi Status Database AD
-    ```PowerShell
-    Get-Service NTDS
-    ```
-    Fungsi: Memeriksa layanan NTDS (NT Directory Services). Ini adalah "jantung" dari Active Directory. Jika statusnya Running, berarti database identitas domain sedang aktif.
-
-3. Verifikasi Nama Domain Lingkungan
-    ```PowerShell
-    $env:USERDOMAIN
-    ```
-    Fungsi: Menampilkan nama domain tempat user yang sedang login berada. Jika hasilnya adalah A3N4, berarti server sudah sukses mengenali dirinya sebagai bagian dari domain tersebut.
+```PowerShell
+Get-WindowsFeature AD-Domain-Services
+Get-Service NTDS
+$env:USERDOMAIN
+```
 
 # DHCP 
 ## Function
@@ -93,44 +64,14 @@ Gunakan perintah ini setelah server melakukan restart otomatis untuk memastikan 
 
 ## Steps Create
 1. Instalasi Role DHCP
-    ```PowerShell
-    Install-WindowsFeature DHCP -includeManagementTools
-    ```
-    * Penjelasan: Mengunduh dan memasang role DHCP Server di Windows Server.
-    * Parameter: `-includeManagementTools` memastikan bahwa GUI (DHCP Console) dan modul PowerShell DHCP ikut terinstal agar server bisa dikelola.
-
-2. Otorisasi DHCP di Active Directory
-    ```PowerShell
-    Add-DHCPServerInDC -DNSName "a3n4.com" -IpAddress 192.168.56.10
-    ```
-    * Penjelasan: Mendaftarkan (mengotorisasi) server DHCP ke dalam Active Directory.
-    * Tujuan: Mencegah adanya "Rogue DHCP Server" (server DHCP liar). Jika tidak diotorisasi, layanan DHCP tidak akan mau berjalan di lingkungan domain.
-
-3. Membuat Scope Baru
-    ```PowerShell
-    Add-DhcpServerV4Scope -Name "Scope-a3n4" -StartRange 192.168.56.11 -EndRange 192.168.56.20 -SubnetMask 255.255.255.0 -State Active
-    ```
-    * Penjelasan: Menentukan rentang alamat IP yang akan dipinjamkan ke komputer klien.
-    * Detail: Kamu menyediakan 10 IP (dari .11 sampai .20) dengan status langsung aktif (-State Active).
-
-4. Konfigurasi Gateway (Option 003)
-    ```PowerShell
-    Set-DHCPServerV4OptionValue -ScopeId 192.168.56.0 -Router 192.168.56.1
-    ```
-    * Penjelasan: Memberitahu klien alamat IP Default Gateway agar mereka bisa terhubung ke internet atau jaringan lain di luar subnet.
-
-5. Konfigurasi DNS & Nama Domain (Option 006 & 015)
-    ```PowerShell
-    Set-DHCPServerV4OptionValue -ScopeId 192.168.56.0 -DnsServer 192.168.56.10 -DnsDomain "a3n4.com"
-    ```
-    * Penjelasan: Memberikan informasi server DNS (192.168.56.10) agar klien bisa menerjemahkan nama domain (seperti https://www.google.com/search?q=google.com) menjadi IP, serta menetapkan sufiks domain utama (a3n4.com).
-
-6. Mengatur Masa Sewa (Lease Duration)
-    ```PowerShell
-    Set-DHCPServerV4Scope -ScopeId 192.168.56.0 -LeaseDuration ([TimeSpan]::FromDays(365))
-    ```
-    * Penjelasan: Menentukan berapa lama klien boleh memegang alamat IP tersebut sebelum harus meminta izin lagi.
-    * Catatan: Kamu mengaturnya menjadi 365 hari. Ini sangat lama; biasanya untuk jaringan lokal standarnya adalah 8 hari, kecuali untuk perangkat yang sangat jarang berpindah.
+```PowerShell
+Install-WindowsFeature DHCP -includeManagementTools
+Add-DHCPServerInDC -DNSName "a3n4.com" -IpAddress 192.168.56.10
+Add-DhcpServerV4Scope -Name "Scope-a3n4" -StartRange 192.168.56.11 -EndRange 192.168.56.20 -SubnetMask 255.255.255.0 -State Active
+Set-DHCPServerV4OptionValue -ScopeId 192.168.56.0 -Router 192.168.56.1
+Set-DHCPServerV4OptionValue -ScopeId 192.168.56.0 -DnsServer 192.168.56.10 -DnsDomain "a3n4.com"
+Set-DHCPServerV4Scope -ScopeId 192.168.56.0 -LeaseDuration ([TimeSpan]::FromDays(365))
+```
 
 ## Steps Install & Connect Client
 1. Install Windows 10 dan sampai berhasil
@@ -284,6 +225,24 @@ Langkah ini fokus pada instalasi role DNS serta pembuatan Reverse Lookup Zone da
                 - `-ZoneName "a3n4.com"`: Nama domain utama tempat rekaman ini akan disimpan.     
                 - `-IPv4Address "192.168.56.10"`: Alamat IP tujuan yang akan dituju saat seseorang memanggil nama www.a3n4.com.    
 
+## Remove Step
+1. Hapus Record A
+    ```PowerShell
+    Remove-DnsServerResourceRecord -Name "www" -ZoneName "a3n4.com" -RRType A -Force
+    ```
+2. Hapus Record PTR
+    ```PowerShell
+    Remove-DnsServerResourceRecord -Name "10" -ZoneName "56.168.192.in-addr.arpa" -RRType PTR -Force
+    ```
+3. Hapus Reverse Lookup Zone
+    ```PowerShell
+    Remove-DnsServerZone -Name "56.168.192.in-addr.arpa" -Force
+    ```
+4. Uninstall
+    ```PowerShell
+    Remove-WindowsFeature -Name DNS -IncludeManagementTools
+    ```
+
 ## Verification Steps
 Setelah dikonfigurasi, kamu harus memastikan server mengenali zona tersebut dan klien bisa menjangkaunya.
 
@@ -351,6 +310,15 @@ Join Domain = Aturan hukum dan sistem kependudukan agar semuanya patuh pada satu
 2. Klik win+r lalu masukkan `sysdm.cpl` untuk masuk ke system properties
 3. pilih change dibagian bawah kanan
 4. Pilih Domain lalu masukkan nama domainnya
+5. Klik ok maka muncul window untuk meminta masukkan credential
+6. Masukkan username dan password domain untuk memberi izin, lalu klik ok
+7. Restart Client
+
+## Steps Remove
+1. Login Windows Client
+2. Klik win+r lalu masukkan `sysdm.cpl` untuk masuk ke system properties
+3. pilih change dibagian bawah kanan
+4. Pilih Workgroup lalu masukkan nama workgroup (misal: WORKGROUP)
 5. Klik ok maka muncul window untuk meminta masukkan credential
 6. Masukkan username dan password domain untuk memberi izin, lalu klik ok
 7. Restart Client
@@ -455,10 +423,30 @@ Jika Domain adalah sebuah kantor besar, maka:
     ```
     Penjelasan: Menghubungkan user dengan departemennya. Setelah ini dijalankan, user tersebut otomatis mendapatkan semua hak akses yang dimiliki oleh grup tersebut.
 
+## Remove Step
+1. Hapus User
+    ```PowerShell
+    Remove-ADUser -Identity "Nama_User"
+    ```
+2. Hapus Group
+    ```PowerShell
+    Remove-ADGroup -Identity "Nama_Group"
+    ```
+3. Hapus OU
+    ```PowerShell
+    Remove-ADOrganizationalUnit -Identity "OU=a3n4_Staff,DC=a3n4,DC=com"
+    ```
+
 ## Verification Step
-Verifikasi Anggota Group
+ 
 ```PowerShell
-Get-ADGroupMember -Identity "All_Staff"
+Get-ADOrganizationalUnit -Filter *
+
+Get-ADGroup -Filter * -SearchBase "OU=a3n4_Staff,DC=a3n4,DC=com"
+
+Get-ADUser -Filter * -SearchBase "OU=a3n4_Staff,DC=a3n4,DC=com"
+
+Get-ADGroupMember -Identity "Nama_Group"
 ```
 Fungsi: Menampilkan daftar siapa saja yang sudah berhasil masuk ke dalam grup All_Staff. Jika nama-nama user yang kamu buat tadi muncul di sini, berarti konfigurasi berhasil.
 
@@ -474,28 +462,14 @@ New-ADUser -Name "Arini Safitri" -GivenName "Arini" -Surname "Safitri" -SamAccou
 **Kenapa ini penting?** Tanpa IIS, server kamu hanyalah komputer biasa. Dengan IIS, kamu bisa membuat website, aplikasi web, atau layanan online yang bisa diakses dari mana saja.
 
 ## Steps Create
-1. Instalasi Role IIS
-
-    ```PowerShell
-    Install-WindowsFeature -Name Web-Server -IncludeManagementTools
-    ```
-    Penjelasan: Mengaktifkan layanan IIS pada Windows Server. Parameter -IncludeManagementTools memastikan kamu mendapatkan akses ke IIS Manager (GUI) dan modul PowerShell terkait.
-
-2. Membuat Folder untuk Website
-    ```Powershell
-    New-Item -Path "C:\inetpub\a3n4web" -ItemType directory
-    ```
-    Penjelasan: 
-
-3. Membuat Website Baru
-    ```Powershell
-    New-Website -Name "a3n4web" -Port 80 -IpAddress "*" -HostHeader "a3n4.com" -PhysicalPath "C:\inetpub\a3n4web"
-    ```
-    Penjelasan:
-
-
 ```Powershell
-Copy-Item -Path "" -Destination "C:\inetpub\a3n4web" -Recurse
+Install-WindowsFeature -Name Web-Server -IncludeManagementTools
+
+New-Item -Path "C:\inetpub\a3n4web" -ItemType directory
+
+New-Website -Name "a3n4web" -Port 80 -IpAddress "*" -HostHeader "a3n4.com" -PhysicalPath "C:\inetpub\a3n4web"
+
+Copy-Item -Path "Z:\web_iis\*" -Destination "C:\inetpub\a3n4web"
 
 Install-WindowsFeature Web-Static-Content
 
@@ -508,7 +482,30 @@ New-WebBinding -Name "a3n4web" -Protocol https -port 443 -IpAddress "*" -HostHea
 Get-Item "cert:\LocalMachine\My\<ThumbPrint>" | New-Item "IIS:SslBindings\0.0.0.0!443!a3n4.com"
 
 ```
+## Steps Remove
+```Powershell
+Remove-Website -Name "a3n4web"
+
+Remove-Item "IIS:\SslBindings\0.0.0.0!443!a3n4.com" -ErrorAction SilentlyContinue
+
+Remove-Item -Path "C:\inetpub\a3n4web" -Recurse -Force
+
+Get-ChildItem Cert:\LocalMachine\My | Where-Object {$_.Subject -eq "CN=a3n4.com"} | Remove-Item
+
+# Optional (kalau yakin mau hapus IIS total)
+# Remove-WindowsFeature Web-Static-Content
+# Remove-WindowsFeature Web-Server -IncludeManagementTools
+```
+
 ## Steps Verification
+### Server
+```Powershell
+Get-WindowsFeature Web-Server
+Get-Website -Name "a3n4web"
+Get-WebBinding -Name "a3n4web"
+```
+
+### Client
 1. Login Client
 2. Ketik http://a3n4.com untuk masuk ke IIS web
 3. Maka akan berhasil ke web
@@ -520,15 +517,29 @@ Get-Item "cert:\LocalMachine\My\<ThumbPrint>" | New-Item "IIS:SslBindings\0.0.0.
 
 # Remote Desktop
 ## Function
-
+### Remote Desktop - Kantor Virtual
+**Filosofi**: Kadang kita butuh bekerja dari tempat lain, atau mengelola server tanpa harus berada di depannya. Remote Desktop memungkinkan kita "mengetik" di komputer lain seolah-olah kita sedang duduk di depan server itu sendiri.
+**Kenapa ini penting?** Dengan Remote Desktop, kamu bisa mengakses server dari mana saja, tanpa harus fisik berada di depan monitor server. Ini sangat berguna untuk admin yang perlu melakukan tugas pemeliharaan atau troubleshooting dari jarak jauh.
 
 ## Steps Create
-### Server
 1. Masuk ke SConfig
 2. Pilih 7
 3. Pilih E untuk Enabled Remote Dekstop
 4. Pilih 1 untuk more secure
 5. Enter dan pilih 13
+
+## Steps Remove
+1. Masuk ke SConfig
+2. Pilih 7
+3. Pilih D untuk Disable Remote Dekstop
+4. Enter dan pilih 13
+
+## Steps Verification
+### Server
+1. Masuk ke Sconfig
+2. Pilih 7
+3. Pastikan statusnya Enabled
+4. Enter dan pilih 13
 
 ### Client
 1. Login Client
@@ -539,10 +550,8 @@ Get-Item "cert:\LocalMachine\My\<ThumbPrint>" | New-Item "IIS:SslBindings\0.0.0.
 6. Pada jendela credential masukkan password user 
 7. Muncul Warning remote computer cannot be verified klik ok (Karna ini server buatan sendiri jadi aman)
 
-## Steps Verification
-
-
 # ADFS
+## Function
 ## Steps Create
 ```Powershell
 Install-WindowsFeature ADFS-Federation -IncludeManagementTools
@@ -555,23 +564,35 @@ Add-KdsRootKey -EffectiveTime ((Get-Date).AddDays(1))
 
 $pass = "2025" | ConvertTo-SecureString -AsPlainText -Force
 $cred = New-Object System.Management.Automation.PSCredential ("A3N4\administrator", $pass)
-
 Install-ADFSFarm -CertificateThumbprint "8A5421340313C07AA2017F76F55984BAC754C422" -FederationServiceName "adfs.a3n4.com" -FederationServiceDisplayName "A3N4 Federation Service" -ServiceAccountCredential $cred
-
 # Masukkan username akun dan password yang akan digunakan lalu klik ok
 
 Set-ADFSProperties -EnableIdpInitiatedSignOnPage $true
 
-Get-Service ADFSSRV
-
 ### PLUS Identity
 New-AdfsWebTheme -Name "TemaBaru" -SourceName "Default"
-
 Set-AdfsWebTheme -TargetName "TemaBaru" -Illustration @{path="Z:\wall_a3n4.jpg"}
-
 Set-AdfsWebTheme -TargetName "TemaBaru" -Logo @{path="Z:\logo_a3n4.png"}
-
 Set-AdfsWebConfig -ActiveThemeName "TemaBaru"
+```
+
+## Steps Remove
+```Powershell
+Uninstall-ADFSFarm
+Get-ChildItem Cert:\LocalMachine\My | Where-Object {$_.Subject -like "*adfs*"} | Remove-Item
+Remove-DnsServerResourceRecord -Name "adfs" -ZoneName "a3n4.com" -RRType A
+Remove-WindowsFeature ADFS-Federation -IncludeManagementTools
+```
+
+## Steps Verification
+### Server
+```Powershell
+Get-WindowsFeature -Name ADFS-Federation
+Get-Service ADFSSRV
+Get-DnsServerResourceRecord -ZoneName "a3n4.com" -Name "adfs"
+Get-ChildItem Cert:\LocalMachine\My\
+Get-ADFSProperties | Select-Object HostName, EnableIdpInitiatedSignonPage, HttpPort, HttpsPort, CertificateDuration
+
 ```
 
 ### Client
@@ -584,51 +605,63 @@ Set-AdfsWebConfig -ActiveThemeName "TemaBaru"
 7. Masukkan Username dan password lalu sign in
 
 
+# Ethernet 2 Unproriety
+## Function
+
+## Steps Create
+```Powershell
+Set-DnsClientServerAddress -InterfaceAlias "Ethernet 2" -ResetServerAddresses
+Set-DnsClient -InterfaceAlias "Ethernet 2" -RegisterThisConnectionsAddress $false
+Set-NetIPInterface -InterfaceAlias "Ethernet" -InterfaceMetric 10
+Set-NetIPInterface -InterfaceAlias "Ethernet 2" -InterfaceMetric 50
+```
 
 # DFS
+## Function
+## Steps Install
 ## Steps Install
 ```Powershell
+Start-Service RemoteRegistry
+Set-Service RemoteRegistry -StartupType Automatic
+
 Install-WindowsFeature Fs-Dfs-NameSpace -IncludeManagementTools
 
+# DFS Root (Namespace storage)
 New-Item -Path "C:\DFSRoots\a3n4_shared" -ItemType Directory
-
 New-SmbShare -Name "DFSa3n4" -Path "C:\DFSRoots\a3n4_shared" -FullAccess "a3n4\Administrator"
 
-New-Dfsnroot -Type domainv2 -Path "\\a3n4.com\data_a3n4" -TargetPath "\\a3n4_server\DFSa3n4"
+New-DfsnRoot -Type DomainV2 -Path "\\a3n4.com\data_a3n4" -TargetPath "\\SRV01\DFSa3n4"
 
+# Data Share
 New-Item -ItemType Directory -Path "C:\Shared"
-
 New-SmbShare -Name "data_share" -Path "C:\Shared" -FullAccess "a3n4\Administrator"
 
+# Folder struktur
 New-Item -ItemType Directory -Path "C:\Shared\AllStaff"
 New-Item -ItemType Directory -Path "C:\Shared\HRStaff"
 New-Item -ItemType Directory -Path "C:\Shared\MarketingStaff"
 New-Item -ItemType Directory -Path "C:\Shared\FinanceStaff"
 
-Icacls "C:\Shared\AllStaff"
+# NTFS Permission (Data)
 Icacls "C:\Shared\AllStaff" /inheritance:r
-Icacls "C:\Shared\AllStaff" /grant "a3n4\AllStaff:(OI)(CI)M" "a3n4\Administrator:(OI)(CI)F"
-Icacls "C:\Shared\AllStaff"
+Icacls "C:\Shared\AllStaff" /grant "a3n4\All_Staff:(OI)(CI)M" "a3n4\Administrator:(OI)(CI)F" "SYSTEM:(OI)(CI)F"
 
-Icacls "C:\Shared\HRStaff" 
 Icacls "C:\Shared\HRStaff" /inheritance:r
-Icacls "C:\Shared\HRStaff" /grant "a3n4\HRStaff:(OI)(CI)M" "a3n4\Administrator:(OI)(CI)F"
-Icacls "C:\Shared\HRStaff"
+Icacls "C:\Shared\HRStaff" /grant "a3n4\HR_Staff:(OI)(CI)M" "a3n4\Administrator:(OI)(CI)F" "SYSTEM:(OI)(CI)F"
 
-Icacls "C:\Shared\FinanceStaff"
 Icacls "C:\Shared\FinanceStaff" /inheritance:r
-Icacls "C:\Shared\FinanceStaff" /grant "a3n4\FinanceStaff:(OI)(CI)M" "a3n4\Administrator:(OI)(CI)F"
-Icacls "C:\Shared\FinanceStaff"
+Icacls "C:\Shared\FinanceStaff" /grant "a3n4\Finance_Staff:(OI)(CI)M" "a3n4\Administrator:(OI)(CI)F" "SYSTEM:(OI)(CI)F"
 
 Icacls "C:\Shared\MarketingStaff" /inheritance:r
-Icacls "C:\Shared\MarketingStaff" /grant "a3n4\MarketingStaff:(OI)(CI)M" "a3n4\Administrator:(OI)(CI)F"
-Icacls "C:\Shared\MarketingStaff"
+Icacls "C:\Shared\MarketingStaff" /grant "a3n4\Marketing_Staff:(OI)(CI)M" "a3n4\Administrator:(OI)(CI)F" "SYSTEM:(OI)(CI)F"
 
-New-DfsnFolder -Path "\\a3n4.com\data_a3n4\AllStaff" -TargetPath "\\a3n4_server\data_share\AllStaff"
-New-DfsnFolder -Path "\\a3n4.com\data_a3n4\HRStaff" -TargetPath "\\a3n4_server\data_share\HRStaff"
-New-DfsnFolder -Path "\\a3n4.com\data_a3n4\MarketingStaff" -TargetPath "\\a3n4_share\data_a3n4\MarketingStaff"
-New-DfsnFolder -Path "\\a3n4.com\data_a3n4\FinanceStaff" -TargetPath "\\a3n4_server\data_share\FinanceStaff"
+# DFS Folder Mapping
+New-DfsnFolder -Path "\\a3n4.com\data_a3n4\AllStaff" -TargetPath "\\SRV01\data_share\AllStaff"
+New-DfsnFolder -Path "\\a3n4.com\data_a3n4\HRStaff" -TargetPath "\\SRV01\data_share\HRStaff"
+New-DfsnFolder -Path "\\a3n4.com\data_a3n4\MarketingStaff" -TargetPath "\\SRV01\data_share\MarketingStaff"
+New-DfsnFolder -Path "\\a3n4.com\data_a3n4\FinanceStaff" -TargetPath "\\SRV01\data_share\FinanceStaff"
 
+# Share Permission
 Grant-SmbShareAccess -Name DFSa3n4 -Account "a3n4\All_Staff" -AccessRight Read -Force
 Grant-SmbShareAccess -Name DFSa3n4 -Account "a3n4\HR_Staff" -AccessRight Read -Force
 Grant-SmbShareAccess -Name DFSa3n4 -Account "a3n4\Finance_Staff" -AccessRight Read -Force
@@ -639,35 +672,55 @@ Grant-SmbShareAccess -Name data_share -Account "a3n4\HR_Staff" -AccessRight Chan
 Grant-SmbShareAccess -Name data_share -Account "a3n4\Finance_Staff" -AccessRight Change -Force
 Grant-SmbShareAccess -Name data_share -Account "a3n4\Marketing_Staff" -AccessRight Change -Force
 
-Set-DfsnRoot -Path "\\a3n4\data_a3n4" -EnableAccessBasedEnumeration $true 
-
-takeown /f "C:\DFSRoots"
-
-Icacls "C:\DFSRoots" /setowner "NT AUTHORITY\SYSTEM" /T /C
-
-Icacls "C:\DFSRoots"
-
-takeown /f "C:\DFSRoots\a3n4_shared\AllStaff" /r /d y
-Icacls "C:\DFSRoots\a3n4_shared\AllStaff" /inheritance:r
-Icacls "C:\DFSRoots\a3n4_shared\AllStaff" /grant "a3n4\All_Staff:(OI)(CI)M"
-Icacls "C:\DFSRoots\a3n4_shared\AllStaff"
-
-takeown /f "C:\DFSRoots\a3n4_shared\HRStaff" /r /d y
-Icacls "C:\DFSRoots\a3n4_shared\HRStaff" /inheritance:r
-Icacls "C:\DFSRoots\a3n4_shared\HRStaff" /grant "a3n4\All_Staff:(OI)(CI)M"
-Icacls "C:\DFSRoots\a3n4_shared\HRStaff"
-
-takeown /f "C:\DFSRoots\a3n4_shared\MarketingStaff" /r /d y
-Icacls "C:\DFSRoots\a3n4_shared\MarketingStaff" /grant "a3n4\Marketing_Staff:(OI)(CI)M"
-Icacls "C:\DFSRoots\a3n4_shared\MarketingStaff"
-
-takeown /f "C:\DFSRoots\a3n4_shared\FinanceStaff" /r /d y
-Icacls "C:\DFSRoots\a3n4_shared\FinanceStaff" /grant "a3n4\Finance_Staff:(OI)(CI)M"
-Icacls "C:\DFSRoots\a3n4_shared\FinanceStaff"
+# Enable ABE
+Set-DfsnRoot -Path "\\a3n4.com\data_a3n4" -EnableAccessBasedEnumeration $true
 
 
 ```
+## Remove Step
+```Powershell
+# Hapus DFS Folder
+Remove-DfsnFolder -Path "\\a3n4.com\data_a3n4\AllStaff" -Force
+Remove-DfsnFolder -Path "\\a3n4.com\data_a3n4\HRStaff" -Force
+Remove-DfsnFolder -Path "\\a3n4.com\data_a3n4\MarketingStaff" -Force
+Remove-DfsnFolder -Path "\\a3n4.com\data_a3n4\FinanceStaff" -Force
+
+# Hapus DFS Namespace
+Remove-DfsnRoot -Path "\\a3n4.com\data_a3n4" -Force
+
+# Hapus DFS Folder
+Remove-DfsnFolder -Path "\\a3n4.com\data_a3n4\AllStaff" -Force
+Remove-DfsnFolder -Path "\\a3n4.com\data_a3n4\HRStaff" -Force
+Remove-DfsnFolder -Path "\\a3n4.com\data_a3n4\MarketingStaff" -Force
+Remove-DfsnFolder -Path "\\a3n4.com\data_a3n4\FinanceStaff" -Force
+# OR
+Remove-DfsnFolder -Path "\\a3n4.com\data_a3n4\*" -Force
+
+# Hapus Share
+Remove-SmbShare -Name "data_share" -Force
+Remove-SmbShare -Name "DFSa3n4" -Force
+
+# Hapus Folder
+Remove-Item "C:\Shared" -Recurse -Force
+Remove-Item "C:\DFSRoots" -Recurse -Force
+
+# (Optional) Uninstall feature
+Uninstall-WindowsFeature Fs-Dfs-NameSpace -IncludeManagementTools
+```
 ## Verification Step
+### Server
+```Powershell
+Get-WindowsFeature Fs-Dfs-NameSpace 
+Get-DfsnRoot
+Get-DfsnFolder -Path "\\a3n4.com\data_a3n4\*"
+Get-SmbShare -Name DFSa3n4
+Get-Acl "C:\Shared\AllStaff" | Format-List
+Get-Acl "C:\Shared\HRStaff" | Format-List
+Get-Acl "C:\Shared\FinanceStaff" | Format-List
+Get-Acl "C:\Shared\MarketingStaff" | Format-List
+```
+
+### Client
 1. Login Client
 2. Klik kanan pada logo windows pilih run
 3. Ketik \\a3n4.com\data_a3n4
@@ -678,16 +731,281 @@ Icacls "C:\DFSRoots\a3n4_shared\FinanceStaff"
 
 
 # FSRM
+## Function
 ## Steps Install
 ```Powershell
-Install-WindowsFeature
+Install-WindowsFeature -Name FS-Resource-Manager -IncludeManagementTools
+
+Restart-Service SrmSvc
+
+New-FsrmQuotaTemplate -Name "250MB" -Description "Maksimum 250MB" -Size 250MB
+New-FsrmQuota -Path "C:\Shared\AllStaff" -Template "250MB"
+
+# Memakai Template bawaan
+New-FsrmQuota -Path "C:\Shared\FinanceStaff" -Template "100 MB Limit"
+New-FsrmQuota -Path "C:\Shared\HRStaff" -Template "100 MB Limit"
+New-FsrmQuota -Path "C:\Shared\MarketingStaff" -Template "100 MB Limit"
+
 ```
 
+## Remove Step
+```Powershell
+Remove-FsrmQuota -Path "C:\Shared\FinanceStaff", "C:\Shared\HRStaff", "C:\Shared\MarketingStaff", "C:\Shared\AllStaff"
+
+Remove-FsrmQuotaTemplate -Name "250MB", "100MB"
+
+Uninstall-WindowsFeature -Name FS-Resource-Manager -IncludeManagementTools
+
+```
+
+## Verification Step
+### Server
+```Powershell
+Get-WindowsFeature -Name FS-Resource-Manager
+
+Get-FsrmQuota | Select-Object Path, Size, Template, Usage
+
+Get-FSRMQuotaTemplate | Select-Object Name, Size
+```
+
+### Client
+1. Login Client
+2. Klik kanan pada logo windows pilih run
+3. Ketik \\a3n4.com\data_a3n4
+4. Maka akan direct ke folder data_a3n4, yang menampilkan folder group yang dimasukin oleh user tsb.
+5. Pada Folder Group User tsb tambahkan beberapa file dan folder
+6. Di Server masuk klik command `Get-FsrmQuota`
+7. Maka akan tampil berapa byte yang telah dipakai oleh folder tsb
+
 # NTP
+## Function
+## Steps Install
+```Powershell
+w32tm /Config /ManualPeerList:"SRV01,0x1" /SyncFromFlags:Manual /Reliable:YES /Update
+
+Start-Service w32time
+
+w32tm /Config /ManualPeerList:"Time.Windows.Com,0x1" /SyncFromFlags:Manual /Reliable:YES /Update
+
+w32tm /ReSync
+```
+
+## Remove Step
+```Powershell
+
+w32tm /unregister
+w32tm /register
+Restart-Service w32time
+w32tm /resync
+```
+
+## Verification Step
+### Server
+```Powershell
+w32tm /Query /Status
+w32tm /Query /Source
+```
+
+### Client
+1. Login Client
+2. Pada Kolom Search cari Date & Time Setting
+3. Pada Bagian Synchronize your clock
+4. Maka tampak tombol `Sync Now` tidak bisa ditekan
 
 # FTP
+## Function
+## Step Install
+```Powershell
+Install-WindowsFeature -Name Web-FTP-Server, Web-FTP-Service, Web-Mgmt-Service, Web-Server
 
-# VPN
+New-Item -Path "C:\FTPRoot" -ItemType Directory
+
+Import-Module WebAdministration
+
+New-WebFtpSite -Name "A3N4FTP" -PhysicalPath "C:\FTPRoot" -port 21 -IPAddress "*"
+
+Set-WebConfigurationProperty -pspath 'MACHINE/WEBROOT/APPHOST' -filter "system.applicationHost/sites/site[@name='A3N4FTP']/ftpServer/security/ssl" -name controlChannelPolicy -value "SslAllow"
+Set-WebConfigurationProperty -pspath 'MACHINE/WEBROOT/APPHOST' -filter "system.applicationHost/sites/site[@name='A3N4FTP']/ftpServer/security/ssl" -name dataChannelPolicy -value "SslAllow"
+
+Set-WebConfigurationProperty -pspath 'MACHINE/WEBROOT/APPHOST' -filter "system.applicationHost/sites/site[@name='A3N4FTP']/ftpServer/security/authentication/basicAuthentication" -name enabled -value true
+
+Add-WebConfigurationProperty -PSPath 'MACHINE/WEBROOT/APPHOST' -Filter "system.applicationHost/sites/site[@name='A3N4FTP']/ftpServer/security/authorization" -Name "." -Value @{AccessType="Allow"; Users="*"; Permissions="Read, Write"}
+
+$acl = Get-Acl "C:\FTPRoot"
+$rule = New-Object System.Security.AccessControl.FileSystemAccessRule("Everyone","Modify","Allow")
+$acl.SetAccessRule($rule)
+Set-Acl "C:\FTPRoot" $acl
+```
+
+## Steps Remove
+```Powershell
+Remove-WebSite -Name "A3N4FTP"
+
+Clear-WebConfiguration -pspath 'MACHINE/WEBROOT/APPHOST' -filter "system.applicationHost/sites/site[@name='A3N4FTP']"
+
+iisreset
+```
+
+## Steps Verification
+### Server
+```Powershell
+Get-WindowsFeature -Name Web-FTP-Server, Web-FTP-Service, Web-Mgmt-Service, Web-Server
+
+Get-WebConfigurationProperty -pspath 'MACHINE/WEBROOT/APPHOST' -filter "system.applicationHost/sites/site[@name='A3N4FTP']/ftpServer/security/ssl" -name *
+
+Get-WebConfiguration -PSPath 'MACHINE/WEBROOT/APPHOST' -Filter "system.applicationHost/sites/site[@name='A3N4FTP']"
+
+Get-Website -Name A3N4FTP
+```
+
+### Client
+1. Login Client.
+2. Buka file explorer, pada url.
+3. masukkan `ftp://192.168.56.10` dan enter.
+4. Maka muncul Window Masukkan Nama user yang sedang login dan passwordnya.
+5. Buat Folder Baru pada directory tsb.
+6. Pada Server masukkan command `ls C:\FTPRoot`.
+7. Maka akan tampil file yang telah dibuat oleh user tsb. 
 
 
 # Mail Server
+## Function
+## Steps Install
+1. Pada server jalankan .exe mailEnable yang telah disiapkan
+2. Jika Belum Copy file dari harddisk atau shared folder ke dir "C:\"
+3. Lalu jalankan file .exe dengan "namafile.exe"
+4. Ikuti langkah instalasi dengan klik next 
+5. Untuk jendela warning Klik Ok
+6. Pada Select Component centang semua, Klik Next
+7. Pada Select Destination Location, klik Next
+8. Pada Enter The name of the program... pilih Mail Enable, Klik Next
+9. Pada Enter Post Office dan Password Masukkan domain.com dan password domain
+10. Pada Masukkan SMTP Masukkan Nama Domain, DNS Host, dan SMTP Port, Klik Next, Lalu Finish
+
+```Powershell
+Add-DnsServerResourceRecordA -Name "mail" -ZoneName "a3n4.com" -IPv4Address "192.168.56.10" -CreatePtr 
+Add-DnsServerResourceRecordCName -Name "autodiscover" -HostNameAlias "mail.a3n4.com" -ZoneName "a3n4.com"
+Add-DnsServerResourceRecord -ZoneName "a3n4.com" -Name "@" -Txt -DescriptiveText "v=spf1 ip4::192.168.56.10 a mx ptr include:mail.a3n4.com -all"
+Add-DnsServerResourceRecordA -Name "webmail" -ZoneName "a3n4.com" -IPv4Address "192.168.56.10" -CreatePtr
+
+Restart-Service DNS
+Import-Module WebAdministration
+
+New-WebBinding -name "MailEnable WebMail" -IPAddress "192.168.56.10" -port 80 -HostHeader "mail.a3n4.com" -Protocol "http"
+New-WebBinding -name "MailEnable WebAdmin" -IPAddress "192.168.56.10" -port 80 -HostHeader "webmail.a3n4.com" -Protocol "http" 
+
+IISReset
+
+cd 'C:\Program Files (x86)\mail enable\postoffices\a3n4.com\mailroot'
+
+Add-PssNapin mailenable.provision.command
+New-MailEnableMailBox -Domain "a3n4.com" -Mailboxes "AmmarShiddiq" -Password "#@amram3" -Right "ADMIN"
+New-MailEnableMailBox -domain "a3n4.com" -mailboxes "AriniSaputri" -password "#@rar1n" -rights "USER"
+
+cd ..\..\..\bin
+
+MEInstaller.exe SetDefaultMailServer -MailServer "mail.a3n4.com"
+MEInstaller.exe setpopalternateport -port 995 -requiressl
+MEInstaller.exe setimapalternateport -port 993 -requiressl 
+```
+
+
+## Steps Remove
+```Powershell
+#Uninstall Mail Server
+
+Remove-DnsServerResourceRecord -ZoneName "a3n4.com" -RRType "A" -Name "mail" -Force
+Remove-DnsServerResourceRecord -ZoneName "a3n4.com" -RRType "A" -Name "webmail" -Force
+Remove-DnsServerResourceRecord -ZoneName "a3n4.com" -RRType "CNAME" -Name "autodiscover" -Force
+Remove-DnsServerResourceRecord -ZoneName "a3n4.com" -RRType "TXT" -Name "@" -Force
+
+Remove-WebBinding -Name "MailEnable WebMail" -Port 80 -HostHeader "mail.a3n4.com"
+Remove-WebBinding -Name "MailEnable WebAdmin" -Port 80 -HostHeader "webmail.a3n4.com"
+
+Remove-Item "C:\Program Files (x86)\Mail Enable\"
+
+# Cari Service yang masih tinggal -> Get-Service -DisplayName *mail*
+sc delete "NamaService"
+```
+
+## Steps Verification
+### Server
+```Powershell
+Get-DnsServerResourceRecord -ZoneName "a3n4.com" -Name "mail"
+Get-DnsServerResourceRecord -ZoneName "a3n4.com" -Name "webmail"
+Get-DnsServerResourceRecord -ZoneName "a3n4.com" -Name "autodiscover"
+Get-DnsServerResourceRecord -ZoneName "a3n4.com" -Name "@" -RRType TXT
+Get-WebBinding -Name "MailEnable WebMail"
+Get-WebBinding -Name "MailEnable WebAdmin"
+Get-Service -DisplayName *mail*
+
+```
+
+
+### Client
+1. Login Client
+2. Buka Browser lalu ketik http://mail.a3n4.com
+3. Maka akan tampil halaman login mail enable
+4. Masukkan username admin dan password lalu klik login
+5. Klik New Email Message
+6. Masukkan email tujuan lalu klik send
+7. Logout Dari admin
+8. Masukkan username user dan password lalu klik login
+9. Klik Inbox
+10. Maka akan tampil email yang telah dikirim oleh admin
+
+
+# VPN
+## Function
+## Step Install
+```Powershell
+Install-WindowsFeature -Name RemoteAccess -IncludeManagementTools
+
+Install-WindowsFeature -Name RSAT-RemoteAccess, DirectAccess-VPN, Routing, RSAT-AD-Powershell
+
+# Restart-Computer
+
+Install-RemoteAccess -VpnType VPN
+
+Set-ADUser -Identity "AmmarShiddiq" -Replace @{msNPAllowDialin = $true}
+
+
+```
+
+## Steps Remove
+```Powershell
+Uninstall-WindowsFeature -Name DirectAccess-VPN, Routing, RSAT-RemoteAccess, RSAT-AD-Powershell
+
+Uninstall-WindowsFeature -Name RemoteAccess -IncludeManagementTools
+
+Uninstall-RemoteAccess -VpnType VPN
+
+Set-ADUser -Identity "AmmarShiddiq" -Replace @{msNPAllowDialin = $false}
+```
+
+## Steps Verification
+### Server
+```Powershell
+Get-WindowsFeature -Name RemoteAccess, RSAT-RemoteAccess, DirectAccess-VPN, Routing, RSAT-AD-Powershell
+
+Get-Service RemoteAccess
+
+Get-RemoteAccess | Select-Object VpnStatus
+
+Get-ADUser -Identity "AmmarShiddiq" -Properties msNPAllowDialin | Select-Object Name, msNPAllowDialin
+Get-ADUser -Filter * -Properties msNPAllowDialin | Select-Object Name, msNPAllowDialin
+```
+
+### Client
+1. Login Client
+2. Klik kanan pada logo windows pilih run
+3. Ketik 'control.exe /name Microsoft.NetworkAndSharingCenter'
+4. Pada Window Network and Sharing Center Klik Set up a new connection or network
+5. Pilih Connect to a workplace lalu klik Next
+6. Pilih Use my Internet connection (VPN) lalu ill set up an internet connection later
+7. Pada Internet Address masukkan ip address server dan destination name
+8. Klik Create
+9. Klik logo internet bagian bawah
+10. Klik nama VPN yang telah dibuat lalu klik Connect
+11. Masukkan username dan password lalu klik Connect
+12. Maka akan terhubung ke VPN Server 

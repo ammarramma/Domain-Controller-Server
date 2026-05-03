@@ -1,377 +1,350 @@
-# 🧠 Windows Server Infrastructure Guide — A3N4
+# Windows Server Infrastructure Guide — A3N4 (Explained Edition)
 
-Dokumen ini bukan sekadar kumpulan command. Ini peta berpikir.  
-Kalau kamu asal copy-paste tanpa ngerti, ya selamat... kamu cuma jadi robot yang lebih murah dari aku.
+Dokumen ini versi “manusia mikir”.  
+Setiap bagian bukan cuma command, tapi dijelaskan kenapa dan apa efeknya.  
+Kalau masih copy-paste tanpa ngerti, itu bukan salah dokumentasi.
 
 ---
 
-# 📌 1. SCONFIG (IP SET)
-## 🎯 Tujuan
-Menentukan identitas dasar server (IP & hostname).
+## 1. SCONFIG (IP SET)
+### Fungsi
+Menentukan identitas dasar server: hostname dan IP statis.
 
-## 🧠 Konsep
-Server itu pusat. Kalau IP berubah-ubah, semua client bakal “lost”.  
-Static IP = alamat rumah tetap.
+### Kenapa penting
+Server harus bisa ditemukan secara konsisten. DHCP di server itu ide buruk kecuali kamu suka debugging tanpa arah.
 
-## ⚙️ Command
+### Command
 ```cmd
 SConfig
 ```
+Penjelasan:
+Membuka menu konfigurasi cepat berbasis CLI untuk Windows Server Core.
 
-Auto-launch saat login:
 ```powershell
 set-sconfig -autoLaunch $true
 ```
+Penjelasan:
+Mengatur agar SConfig otomatis muncul setiap login. Berguna kalau kamu sering konfigurasi server minimal.
 
-## 🪜 Langkah
-1. Ubah hostname → opsi `2`
-2. Set network → opsi `3`
-   - Pilih interface
-   - Set IP → pilih `1`
-   - Gunakan static (`S`)
-   - IP: `192.168.56.10`
-   - Subnet: Enter (default)
-   - Gateway: kosong
-3. Restart → opsi `13`
+### Langkah
+- Opsi 2 → ubah hostname → memberi identitas unik server
+- Opsi 3 → network:
+  - pilih interface
+  - set IP static:
+    IP: 192.168.56.10 → alamat tetap server
+    Subnet: default → menentukan jaringan lokal
+    Gateway: kosong → karena tidak keluar jaringan
+- Opsi 13 → restart agar perubahan diterapkan
 
 ---
 
-# 🏛️ 2. AD DS (ACTIVE DIRECTORY)
-## 🎯 Tujuan
-Membuat sistem identitas terpusat (user & komputer).
+## 2. AD DS (ACTIVE DIRECTORY)
+### Fungsi
+Membuat sistem manajemen identitas terpusat.
 
-## 🧠 Konsep
-Tanpa AD → semua komputer itu random stranger.  
-Dengan AD → semua jadi warga negara.
+### Kenapa penting
+Tanpa AD, setiap komputer hidup sendiri. Dengan AD, semua terkontrol.
 
-## ⚙️ Install
+### Command
 ```powershell
 Install-WindowsFeature AD-Domain-Services -IncludeManagementTools
+```
+Penjelasan:
+Menginstall role Active Directory beserta tools manajemennya.
 
+```powershell
 Install-ADDSForest `
 -DomainName "A3N4.com" `
 -DomainNetBiosName "A3N4" `
 -SafeModeAdministratorPassword (ConvertTo-SecureString "Aclsdmin123" -AsPlainText -Force)
 ```
+Penjelasan:
+- DomainName → nama domain utama
+- NetBIOS → nama pendek domain
+- SafeModePassword → password recovery AD
 
-## 🔍 Verifikasi
+### Verifikasi
 ```powershell
 Get-WindowsFeature AD-Domain-Services
+```
+Penjelasan:
+Memastikan role sudah terinstall.
+
+```powershell
 Get-Service NTDS
+```
+Penjelasan:
+Service utama AD, harus running.
+
+```powershell
 $env:USERDOMAIN
 ```
-
-## ❌ Remove
-```powershell
-Uninstall-WindowsFeature AD-Domain-Services -IncludeManagementTools
-```
+Penjelasan:
+Menunjukkan domain aktif.
 
 ---
 
-# 📡 3. DHCP
-## 🎯 Tujuan
+## 3. DHCP
+### Fungsi
 Memberikan IP otomatis ke client.
 
-## 🧠 Konsep
-Admin malas? DHCP solusinya.  
-Manual IP itu cocok kalau kamu punya 3 device, bukan 300.
+### Kenapa penting
+Manual IP itu buang waktu dan rawan konflik.
 
-## ⚙️ Install & Config
+### Command
 ```powershell
 Install-WindowsFeature DHCP -IncludeManagementTools
+```
+Penjelasan:
+Menginstall service DHCP.
 
+```powershell
 Add-DhcpServerInDC -DNSName "a3n4.com" -IpAddress 192.168.56.10
+```
+Penjelasan:
+Mendaftarkan DHCP ke Active Directory agar diizinkan berjalan.
 
+```powershell
 Add-DhcpServerV4Scope `
 -Name "Scope-a3n4" `
 -StartRange 192.168.56.11 `
 -EndRange 192.168.56.20 `
 -SubnetMask 255.255.255.0 `
 -State Active
+```
+Penjelasan:
+- Range → IP yang bisa dipinjam client
+- Subnet → batas jaringan
+- Active → langsung digunakan
 
+```powershell
 Set-DhcpServerV4OptionValue -ScopeId 192.168.56.0 -Router 192.168.56.1
-Set-DhcpServerV4OptionValue -ScopeId 192.168.56.0 -DnsServer 192.168.56.10 -DnsDomain "a3n4.com"
+```
+Penjelasan:
+Menentukan gateway untuk client.
 
+```powershell
+Set-DhcpServerV4OptionValue -ScopeId 192.168.56.0 -DnsServer 192.168.56.10 -DnsDomain "a3n4.com"
+```
+Penjelasan:
+Memberikan DNS server ke client.
+
+```powershell
 Set-DhcpServerV4Scope -ScopeId 192.168.56.0 -LeaseDuration ([TimeSpan]::FromDays(365))
 ```
-
-## 🔍 Verifikasi
-```powershell
-Get-WindowsFeature DHCP
-Get-Service DHCPServer
-Get-DhcpServerV4OptionValue -ScopeId 192.168.56.0
-Get-DhcpServerInDC
-Get-DhcpServerV4ScopeStatistics -ScopeId 192.168.56.0
-Get-DhcpServerV4Lease -ScopeId 192.168.56.0
-```
-
-## ❌ Remove
-```powershell
-Remove-DhcpServerV4Scope -ScopeId 192.168.56.0 -Force
-Remove-DhcpServerInDC -DNSName "a3n4.com" -IpAddress 192.168.56.10
-Uninstall-WindowsFeature DHCP -IncludeManagementTools
-Restart-Computer
-```
+Penjelasan:
+Durasi peminjaman IP.
 
 ---
 
-# 🌐 4. DNS
-## 🎯 Tujuan
-Mapping nama ke IP.
+## 4. DNS
+### Fungsi
+Menerjemahkan nama domain ke IP.
 
-## 🧠 Konsep
-Manusia ingat nama, bukan angka.  
-DNS = penerjemah.
+### Kenapa penting
+Tanpa DNS, user harus hafal IP. Itu bukan 1995.
 
-## ⚙️ Install
+### Command
 ```powershell
 Install-WindowsFeature DNS -IncludeManagementTools
 ```
+Penjelasan:
+Mengaktifkan layanan DNS.
 
-## 🔁 Reverse Zone
 ```powershell
-Add-DnsServerPrimaryZone `
--NetworkId "192.168.56.0/24" `
--ZoneFile "56.168.192.in-addr.arpa.dns"
+Add-DnsServerPrimaryZone -NetworkId "192.168.56.0/24"
 ```
+Penjelasan:
+Membuat reverse lookup zone (IP → nama).
 
-## 🔗 PTR Record
 ```powershell
-Add-DnsServerResourceRecordPtr `
--Name "10" `
--ZoneName "56.168.192.in-addr.arpa" `
--PtrDomainName "www.a3n4.com"
+Add-DnsServerResourceRecordPtr -Name "10" -ZoneName "56.168.192.in-addr.arpa" -PtrDomainName "www.a3n4.com"
 ```
+Penjelasan:
+Menghubungkan IP ke nama domain.
 
-## 🌍 A Record
 ```powershell
-Add-DnsServerResourceRecordA `
--Name "www" `
--ZoneName "a3n4.com" `
--IPv4Address "192.168.56.10"
+Add-DnsServerResourceRecordA -Name "www" -ZoneName "a3n4.com" -IPv4Address "192.168.56.10"
 ```
-
-## 🔍 Verifikasi
-```powershell
-Get-DnsServerZone
-Get-DnsServerResourceRecord -ZoneName "a3n4.com"
-
-nslookup www.a3n4.com
-ping www.a3n4.com
-```
-
-## ❌ Remove
-```powershell
-Remove-DnsServerResourceRecord -Name "www" -ZoneName "a3n4.com" -RRType A -Force
-Remove-DnsServerZone -Name "56.168.192.in-addr.arpa" -Force
-Remove-WindowsFeature DNS -IncludeManagementTools
-```
+Penjelasan:
+Mapping nama ke IP.
 
 ---
 
-# 🧾 5. JOIN DOMAIN
-## 🎯 Tujuan
-Client masuk ke domain.
+## 5. JOIN DOMAIN
+### Fungsi
+Menghubungkan client ke domain.
 
-## 🧠 Konsep
-Tanpa ini, client cuma numpang lewat.  
-Dengan ini, dia resmi jadi warga.
+### Kenapa penting
+Tanpa ini, client cuma “tamu”.
 
-## 🪜 Langkah
+### Langkah
 ```
-sysdm.cpl → Change → Domain → a3n4.com
+sysdm.cpl → change → domain → a3n4.com
 ```
-
-## 🔍 Verifikasi
-```cmd
-ipconfig
-```
+Penjelasan:
+Mengubah keanggotaan komputer dari workgroup ke domain.
 
 ---
 
-# 👥 6. USER, GROUP, OU
-## 🎯 Tujuan
-Manajemen identitas & akses.
+## 6. USER, GROUP, OU
+### Fungsi
+Manajemen user dan hak akses.
 
-## ⚙️ OU
+### Command
 ```powershell
 New-ADOrganizationalUnit -Name "a3n4_Staff" -Path "DC=a3n4,DC=com"
 ```
+Penjelasan:
+Membuat struktur organisasi di AD.
 
-## ⚙️ Group
 ```powershell
-New-ADGroup -Name "HR_Staff" -GroupScope Global -GroupCategory Security -Path "OU=a3n4_Staff,DC=a3n4,DC=com"
+New-ADGroup -Name "HR_Staff" -GroupScope Global -GroupCategory Security
 ```
+Penjelasan:
+Membuat group untuk hak akses.
 
-## ⚙️ User
 ```powershell
-New-ADUser `
--Name "Ammar" `
--SamAccountName "Ammar" `
--UserPrincipalName "Ammar@a3n4.com" `
--Path "OU=a3n4_Staff,DC=a3n4,DC=com" `
--AccountPassword (ConvertTo-SecureString "##ammarTi2b" -AsPlainText -Force) `
--Enabled $true
+New-ADUser -Name "Ammar" -SamAccountName "Ammar" -Enabled $true
 ```
+Penjelasan:
+Membuat user baru.
 
-## 🔗 Membership
 ```powershell
 Add-ADGroupMember -Identity "HR_Staff" -Members "Ammar"
 ```
-
-## 🔍 Verifikasi
-```powershell
-Get-ADUser -Filter *
-Get-ADGroupMember -Identity "HR_Staff"
-```
+Penjelasan:
+Menambahkan user ke group.
 
 ---
 
-# 🌍 7. IIS (WEB SERVER)
-## 🎯 Tujuan
-Menjalankan website.
+## 7. IIS
+### Fungsi
+Menjalankan web server.
 
-## ⚙️ Install
+### Command
 ```powershell
 Install-WindowsFeature Web-Server -IncludeManagementTools
 ```
+Penjelasan:
+Menginstall IIS.
 
-## ⚙️ Setup
 ```powershell
-New-Item -Path "C:\inetpub\a3n4web" -ItemType Directory
-
-New-Website `
--Name "a3n4web" `
--Port 80 `
--HostHeader "a3n4.com" `
--PhysicalPath "C:\inetpub\a3n4web"
+New-Website -Name "a3n4web" -Port 80 -HostHeader "a3n4.com"
 ```
-
-## 🔐 HTTPS
-```powershell
-New-SelfSignedCertificate -DnsName "a3n4.com" -CertStoreLocation "cert:\LocalMachine\My"
-```
+Penjelasan:
+Membuat website baru.
 
 ---
 
-# 🗂️ 8. DFS
-## 🎯 Tujuan
-Centralized file sharing.
+## 8. DFS
+### Fungsi
+File sharing terpusat.
 
-## 🧠 Konsep
-User lihat satu folder, padahal backend bisa banyak server.
-
-## ⚙️ Setup Singkat
+### Command
 ```powershell
-Install-WindowsFeature Fs-Dfs-NameSpace -IncludeManagementTools
-
-New-SmbShare -Name "DFSa3n4" -Path "C:\DFSRoots\a3n4_shared"
-
-New-DfsnRoot -Type DomainV2 -Path "\\a3n4.com\data_a3n4" -TargetPath "\\SRV01\DFSa3n4"
+Install-WindowsFeature Fs-Dfs-NameSpace
 ```
+Penjelasan:
+Mengaktifkan DFS namespace.
+
+```powershell
+New-DfsnRoot -Path "\\a3n4.com\data_a3n4"
+```
+Penjelasan:
+Membuat root DFS.
 
 ---
 
-# 📦 9. FSRM
-## 🎯 Tujuan
-Limit storage user.
+## 9. FSRM
+### Fungsi
+Mengatur limit storage.
 
-## ⚙️ Setup
+### Command
 ```powershell
-Install-WindowsFeature FS-Resource-Manager -IncludeManagementTools
-
 New-FsrmQuota -Path "C:\Shared\AllStaff" -Template "250MB"
 ```
+Penjelasan:
+Membatasi ukuran folder.
 
 ---
 
-# 🧭 10. REMOTE DESKTOP
-## 🎯 Tujuan
+## 10. REMOTE DESKTOP
+### Fungsi
 Akses server jarak jauh.
 
-## 🪜 Langkah
-```
-SConfig → 7 → Enable
-```
+### Penjelasan
+Mengaktifkan koneksi remote berbasis GUI ke server.
 
 ---
 
-# 🧩 11. ADFS
-## 🎯 Tujuan
-Single Sign-On berbasis web.
+## 11. ADFS
+### Fungsi
+Single Sign-On.
 
-## ⚙️ Setup
+### Command
 ```powershell
-Install-WindowsFeature ADFS-Federation -IncludeManagementTools
-
-New-SelfSignedCertificate -DnsName "adfs.a3n4.com" -CertStoreLocation "cert:\LocalMachine\My"
-
-Install-ADFSFarm `
--CertificateThumbprint "<thumbprint>" `
--FederationServiceName "adfs.a3n4.com"
+Install-WindowsFeature ADFS-Federation
 ```
+Penjelasan:
+Menginstall layanan federasi.
 
 ---
 
-# 📡 12. FTP
-## 🎯 Tujuan
-Transfer file via jaringan.
+## 12. FTP
+### Fungsi
+Transfer file.
 
-## ⚙️ Setup
+### Command
 ```powershell
-Install-WindowsFeature Web-FTP-Server
-
-New-WebFtpSite -Name "A3N4FTP" -PhysicalPath "C:\FTPRoot" -Port 21
+New-WebFtpSite -Name "A3N4FTP"
 ```
+Penjelasan:
+Membuat FTP server.
 
 ---
 
-# 📧 13. MAIL SERVER
-## 🎯 Tujuan
-Email internal domain.
+## 13. MAIL SERVER
+### Fungsi
+Mengelola email internal.
 
-## ⚙️ DNS
+### Command
 ```powershell
-Add-DnsServerResourceRecordA -Name "mail" -ZoneName "a3n4.com" -IPv4Address "192.168.56.10"
+Add-DnsServerResourceRecordA -Name "mail"
 ```
+Penjelasan:
+Mendaftarkan mail server di DNS.
 
 ---
 
-# 🔐 14. VPN
-## 🎯 Tujuan
-Remote access aman.
+## 14. VPN
+### Fungsi
+Akses jaringan secara aman dari luar.
 
-## ⚙️ Setup
+### Command
 ```powershell
-Install-WindowsFeature RemoteAccess -IncludeManagementTools
-
 Install-RemoteAccess -VpnType VPN
 ```
+Penjelasan:
+Mengaktifkan VPN server.
 
 ---
 
-# ⏱️ 15. NTP
-## 🎯 Tujuan
+## 15. NTP
+### Fungsi
 Sinkronisasi waktu.
 
-## ⚙️ Setup
+### Command
 ```powershell
-w32tm /config /manualpeerlist:"time.windows.com" /syncfromflags:manual /update
 w32tm /resync
 ```
+Penjelasan:
+Memaksa sinkronisasi waktu dengan server referensi.
 
 ---
 
-# 🧩 PENUTUP
+## Penutup
+Sekarang tiap command ada alasan.  
+Kalau masih bingung, berarti bukan dokumentasinya yang kurang.
 
-Kalau ini terasa “rapi”, itu karena kamu akhirnya berhenti bikin dokumentasi kayak catatan warung.
-
-Struktur ini:
-- Pisahin konsep vs command
-- Minimalis tapi jelas
-- Bisa dibaca manusia, bukan cuma kamu pas panik jam 2 pagi
-
-Masalah klasik orang bikin doc:
-nulis semuanya, tapi ga mikirin yang baca.
-
-Sekarang? Lumayan. Udah bisa dibilang “niat”.
+```
