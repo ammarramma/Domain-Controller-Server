@@ -672,9 +672,15 @@ Set-NetIPInterface -InterfaceAlias "Ethernet 2" -InterfaceMetric 50
 ```
 
 # DFS
+
 ## Function
-## Steps Install
-## Steps Install
+### DFS (Distributed File System) - Distributed Storage System
+
+### Philosophy
+DFS allows you to combine several folders spread across different servers into one virtual folder that users can easily access. Users do not need to know where the files are actually stored — they simply access `\\a3n4.com\data_a3n4`, and DFS directs them to the correct server.
+
+### Steps - Create
+
 ```Powershell
 Start-Service RemoteRegistry
 Set-Service RemoteRegistry -StartupType Automatic
@@ -691,13 +697,13 @@ New-DfsnRoot -Type DomainV2 -Path "\\a3n4.com\data_a3n4" -TargetPath "\\SRV01\DF
 New-Item -ItemType Directory -Path "C:\Shared"
 New-SmbShare -Name "data_share" -Path "C:\Shared" -FullAccess "a3n4\Administrator"
 
-# Folder struktur
+# Folder Structure
 New-Item -ItemType Directory -Path "C:\Shared\AllStaff"
 New-Item -ItemType Directory -Path "C:\Shared\HRStaff"
 New-Item -ItemType Directory -Path "C:\Shared\MarketingStaff"
 New-Item -ItemType Directory -Path "C:\Shared\FinanceStaff"
 
-# NTFS Permission (Data)
+# NTFS Permissions
 Icacls "C:\Shared\AllStaff" /inheritance:r
 Icacls "C:\Shared\AllStaff" /grant "a3n4\All_Staff:(OI)(CI)M" "a3n4\Administrator:(OI)(CI)F" "SYSTEM:(OI)(CI)F"
 
@@ -716,7 +722,7 @@ New-DfsnFolder -Path "\\a3n4.com\data_a3n4\HRStaff" -TargetPath "\\SRV01\data_sh
 New-DfsnFolder -Path "\\a3n4.com\data_a3n4\MarketingStaff" -TargetPath "\\SRV01\data_share\MarketingStaff"
 New-DfsnFolder -Path "\\a3n4.com\data_a3n4\FinanceStaff" -TargetPath "\\SRV01\data_share\FinanceStaff"
 
-# Share Permission
+# Share Permissions
 Grant-SmbShareAccess -Name DFSa3n4 -Account "a3n4\All_Staff" -AccessRight Read -Force
 Grant-SmbShareAccess -Name DFSa3n4 -Account "a3n4\HR_Staff" -AccessRight Read -Force
 Grant-SmbShareAccess -Name DFSa3n4 -Account "a3n4\Finance_Staff" -AccessRight Read -Force
@@ -727,43 +733,39 @@ Grant-SmbShareAccess -Name data_share -Account "a3n4\HR_Staff" -AccessRight Chan
 Grant-SmbShareAccess -Name data_share -Account "a3n4\Finance_Staff" -AccessRight Change -Force
 Grant-SmbShareAccess -Name data_share -Account "a3n4\Marketing_Staff" -AccessRight Change -Force
 
-# Enable ABE
+# Enable Access-Based Enumeration
 Set-DfsnRoot -Path "\\a3n4.com\data_a3n4" -EnableAccessBasedEnumeration $true
-
-
 ```
-## Remove Step
+
+### Steps - Remove
+
 ```Powershell
-# Hapus DFS Folder
+# Remove DFS Folders
 Remove-DfsnFolder -Path "\\a3n4.com\data_a3n4\AllStaff" -Force
 Remove-DfsnFolder -Path "\\a3n4.com\data_a3n4\HRStaff" -Force
 Remove-DfsnFolder -Path "\\a3n4.com\data_a3n4\MarketingStaff" -Force
 Remove-DfsnFolder -Path "\\a3n4.com\data_a3n4\FinanceStaff" -Force
-
-# Hapus DFS Namespace
-Remove-DfsnRoot -Path "\\a3n4.com\data_a3n4" -Force
-
-# Hapus DFS Folder
-Remove-DfsnFolder -Path "\\a3n4.com\data_a3n4\AllStaff" -Force
-Remove-DfsnFolder -Path "\\a3n4.com\data_a3n4\HRStaff" -Force
-Remove-DfsnFolder -Path "\\a3n4.com\data_a3n4\MarketingStaff" -Force
-Remove-DfsnFolder -Path "\\a3n4.com\data_a3n4\FinanceStaff" -Force
-# OR
+# OR remove all at once:
 Remove-DfsnFolder -Path "\\a3n4.com\data_a3n4\*" -Force
 
-# Hapus Share
+# Remove DFS Namespace
+Remove-DfsnRoot -Path "\\a3n4.com\data_a3n4" -Force
+
+# Remove Shares
 Remove-SmbShare -Name "data_share" -Force
 Remove-SmbShare -Name "DFSa3n4" -Force
 
-# Hapus Folder
+# Remove Folders
 Remove-Item "C:\Shared" -Recurse -Force
 Remove-Item "C:\DFSRoots" -Recurse -Force
 
 # (Optional) Uninstall feature
 Uninstall-WindowsFeature Fs-Dfs-NameSpace -IncludeManagementTools
 ```
-## Verification Step
-### Server
+
+### Steps - Verification
+
+#### Server
 ```Powershell
 Get-WindowsFeature Fs-Dfs-NameSpace 
 Get-DfsnRoot
@@ -775,46 +777,52 @@ Get-Acl "C:\Shared\FinanceStaff" | Format-List
 Get-Acl "C:\Shared\MarketingStaff" | Format-List
 ```
 
-### Client
-1. Login Client
-2. Klik kanan pada logo windows pilih run
-3. Ketik \\a3n4.com\data_a3n4
-4. Maka akan direct ke folder data_a3n4, yang menampilkan folder group yang dimasukin oleh user tsb.
-5. Pada Folder Group User tsb buatlah sebuah file
-6. Di Server masuk ke directory C:\Shared\<Folder_Group_user_sebelumnya>
-7. Maka akan tampil file yang telah dibuat oleh user tsb. 
+#### Client
+1. Log in to the Client.
+2. Press `Win + R`, type `\\a3n4.com\data_a3n4`, and press Enter.
+3. The shared folder will open, showing only the folders for the groups the user belongs to.
+4. Create a file inside the user's group folder.
+5. On the Server, navigate to `C:\Shared\<GroupFolder>`.
+6. The file created by the client will appear.
 
 
 # FSRM
+
 ## Function
-## Steps Install
+### FSRM (File Server Resource Manager) - Storage Resource Manager
+
+### Philosophy
+FSRM acts as a resource manager that ensures no user abuses the storage space by saving overly large files. With FSRM, you can set quota limits on specific folders to prevent users from filling up the disk with unnecessary files.
+
+### Steps - Create
+
 ```Powershell
 Install-WindowsFeature -Name FS-Resource-Manager -IncludeManagementTools
 
 Restart-Service SrmSvc
 
-New-FsrmQuotaTemplate -Name "250MB" -Description "Maksimum 250MB" -Size 250MB
+New-FsrmQuotaTemplate -Name "250MB" -Description "Maximum 250MB" -Size 250MB
 New-FsrmQuota -Path "C:\Shared\AllStaff" -Template "250MB"
 
-# Memakai Template bawaan
+# Using built-in templates
 New-FsrmQuota -Path "C:\Shared\FinanceStaff" -Template "100 MB Limit"
 New-FsrmQuota -Path "C:\Shared\HRStaff" -Template "100 MB Limit"
 New-FsrmQuota -Path "C:\Shared\MarketingStaff" -Template "100 MB Limit"
-
 ```
 
-## Remove Step
+### Steps - Remove
+
 ```Powershell
 Remove-FsrmQuota -Path "C:\Shared\FinanceStaff", "C:\Shared\HRStaff", "C:\Shared\MarketingStaff", "C:\Shared\AllStaff"
 
 Remove-FsrmQuotaTemplate -Name "250MB", "100MB"
 
 Uninstall-WindowsFeature -Name FS-Resource-Manager -IncludeManagementTools
-
 ```
 
-## Verification Step
-### Server
+### Steps - Verification
+
+#### Server
 ```Powershell
 Get-WindowsFeature -Name FS-Resource-Manager
 
@@ -823,18 +831,22 @@ Get-FsrmQuota | Select-Object Path, Size, Template, Usage
 Get-FSRMQuotaTemplate | Select-Object Name, Size
 ```
 
-### Client
-1. Login Client
-2. Klik kanan pada logo windows pilih run
-3. Ketik \\a3n4.com\data_a3n4
-4. Maka akan direct ke folder data_a3n4, yang menampilkan folder group yang dimasukin oleh user tsb.
-5. Pada Folder Group User tsb tambahkan beberapa file dan folder
-6. Di Server masuk klik command `Get-FsrmQuota`
-7. Maka akan tampil berapa byte yang telah dipakai oleh folder tsb
+#### Client
+1. Log in to the Client.
+2. Press `Win + R`, type `\\a3n4.com\data_a3n4`, and press Enter.
+3. Navigate to the user's group folder and add some files/folders.
+4. On the Server, run `Get-FsrmQuota` to see how much space has been used.
 
 # NTP
+
 ## Function
-## Steps Install
+### NTP (Network Time Protocol) - Time Keeper
+
+### Philosophy
+Time is everything. NTP ensures all computers on the network have synchronized time, preventing communication issues. Many services depend on accurate time — authentication, logging, and scheduling will all fail if time is out of sync.
+
+### Steps - Create
+
 ```Powershell
 w32tm /Config /ManualPeerList:"SRV01,0x1" /SyncFromFlags:Manual /Reliable:YES /Update
 
@@ -845,31 +857,38 @@ w32tm /Config /ManualPeerList:"Time.Windows.Com,0x1" /SyncFromFlags:Manual /Reli
 w32tm /ReSync
 ```
 
-## Remove Step
-```Powershell
+### Steps - Remove
 
+```Powershell
 w32tm /unregister
 w32tm /register
 Restart-Service w32time
 w32tm /resync
 ```
 
-## Verification Step
-### Server
+### Steps - Verification
+
+#### Server
 ```Powershell
 w32tm /Query /Status
 w32tm /Query /Source
 ```
 
-### Client
-1. Login Client
-2. Pada Kolom Search cari Date & Time Setting
-3. Pada Bagian Synchronize your clock
-4. Maka tampak tombol `Sync Now` tidak bisa ditekan
+#### Client
+1. Log in to the Client.
+2. Search for **Date & Time Settings**.
+3. Under **Synchronize your clock**, the **Sync Now** button will be unavailable (time is managed by the server).
 
 # FTP
+
 ## Function
-## Step Install
+### FTP (File Transfer Protocol) - File Courier
+
+### Philosophy
+FTP is a service that allows you to send and receive files over the network. It acts like a courier delivering packages from one place to another. With FTP, you can easily upload or download files from the server without needing physical media like flash drives.
+
+### Steps - Create
+
 ```Powershell
 Install-WindowsFeature -Name Web-FTP-Server, Web-FTP-Service, Web-Mgmt-Service, Web-Server
 
@@ -877,12 +896,12 @@ New-Item -Path "C:\FTPRoot" -ItemType Directory
 
 Import-Module WebAdministration
 
-New-WebFtpSite -Name "A3N4FTP" -PhysicalPath "C:\FTPRoot" -port 21 -IPAddress "*"
+New-WebFtpSite -Name "A3N4FTP" -PhysicalPath "C:\FTPRoot" -Port 21 -IPAddress "*"
 
-Set-WebConfigurationProperty -pspath 'MACHINE/WEBROOT/APPHOST' -filter "system.applicationHost/sites/site[@name='A3N4FTP']/ftpServer/security/ssl" -name controlChannelPolicy -value "SslAllow"
-Set-WebConfigurationProperty -pspath 'MACHINE/WEBROOT/APPHOST' -filter "system.applicationHost/sites/site[@name='A3N4FTP']/ftpServer/security/ssl" -name dataChannelPolicy -value "SslAllow"
+Set-WebConfigurationProperty -PSPath 'MACHINE/WEBROOT/APPHOST' -Filter "system.applicationHost/sites/site[@name='A3N4FTP']/ftpServer/security/ssl" -Name controlChannelPolicy -Value "SslAllow"
+Set-WebConfigurationProperty -PSPath 'MACHINE/WEBROOT/APPHOST' -Filter "system.applicationHost/sites/site[@name='A3N4FTP']/ftpServer/security/ssl" -Name dataChannelPolicy -Value "SslAllow"
 
-Set-WebConfigurationProperty -pspath 'MACHINE/WEBROOT/APPHOST' -filter "system.applicationHost/sites/site[@name='A3N4FTP']/ftpServer/security/authentication/basicAuthentication" -name enabled -value true
+Set-WebConfigurationProperty -PSPath 'MACHINE/WEBROOT/APPHOST' -Filter "system.applicationHost/sites/site[@name='A3N4FTP']/ftpServer/security/authentication/basicAuthentication" -Name enabled -Value true
 
 Add-WebConfigurationProperty -PSPath 'MACHINE/WEBROOT/APPHOST' -Filter "system.applicationHost/sites/site[@name='A3N4FTP']/ftpServer/security/authorization" -Name "." -Value @{AccessType="Allow"; Users="*"; Permissions="Read, Write"}
 
@@ -892,83 +911,89 @@ $acl.SetAccessRule($rule)
 Set-Acl "C:\FTPRoot" $acl
 ```
 
-## Steps Remove
+### Steps - Remove
+
 ```Powershell
 Remove-WebSite -Name "A3N4FTP"
 
-Clear-WebConfiguration -pspath 'MACHINE/WEBROOT/APPHOST' -filter "system.applicationHost/sites/site[@name='A3N4FTP']"
+Clear-WebConfiguration -PSPath 'MACHINE/WEBROOT/APPHOST' -Filter "system.applicationHost/sites/site[@name='A3N4FTP']"
 
 iisreset
 ```
 
-## Steps Verification
-### Server
+### Steps - Verification
+
+#### Server
 ```Powershell
 Get-WindowsFeature -Name Web-FTP-Server, Web-FTP-Service, Web-Mgmt-Service, Web-Server
 
-Get-WebConfigurationProperty -pspath 'MACHINE/WEBROOT/APPHOST' -filter "system.applicationHost/sites/site[@name='A3N4FTP']/ftpServer/security/ssl" -name *
+Get-WebConfigurationProperty -PSPath 'MACHINE/WEBROOT/APPHOST' -Filter "system.applicationHost/sites/site[@name='A3N4FTP']/ftpServer/security/ssl" -Name *
 
 Get-WebConfiguration -PSPath 'MACHINE/WEBROOT/APPHOST' -Filter "system.applicationHost/sites/site[@name='A3N4FTP']"
 
 Get-Website -Name A3N4FTP
 ```
 
-### Client
-1. Login Client.
-2. Buka file explorer, pada url.
-3. masukkan `ftp://192.168.56.10` dan enter.
-4. Maka muncul Window Masukkan Nama user yang sedang login dan passwordnya.
-5. Buat Folder Baru pada directory tsb.
-6. Pada Server masukkan command `ls C:\FTPRoot`.
-7. Maka akan tampil file yang telah dibuat oleh user tsb. 
+#### Client
+1. Log in to the Client.
+2. Open File Explorer and enter `ftp://172.18.18.180` in the address bar.
+3. A login window will appear — enter the current username and password.
+4. Create a new folder in the FTP directory.
+5. On the Server, run `ls C:\FTPRoot` to see the file created by the client.
 
 
 # Mail Server
+
 ## Function
-## Steps Install
-1. Pada server jalankan .exe mailEnable yang telah disiapkan
-2. Jika Belum Copy file dari harddisk atau shared folder ke dir "C:\"
-3. Lalu jalankan file .exe dengan "namafile.exe"
-4. Ikuti langkah instalasi dengan klik next 
-5. Untuk jendela warning Klik Ok
-6. Pada Select Component centang semua, Klik Next
-7. Pada Select Destination Location, klik Next
-8. Pada Enter The name of the program... pilih Mail Enable, Klik Next
-9. Pada Enter Post Office dan Password Masukkan domain.com dan password domain
-10. Pada Masukkan SMTP Masukkan Nama Domain, DNS Host, dan SMTP Port, Klik Next, Lalu Finish
+### Mail Server - Digital Post Office
+
+### Philosophy
+A mail server acts as a digital post office. It handles sending, receiving, and storing emails for users on the network. This is one of the most fundamental communication services in IT.
+
+### Steps - Install MailEnable
+
+1. Copy the MailEnable installer from the shared folder to `C:\`.
+2. Run the `.exe` installer.
+3. Follow the installation wizard:
+   - Click **Next** through any warnings.
+   - **Select Components**: Check all components → **Next**.
+   - **Destination Location**: Click **Next**.
+   - **Program Name**: Select "Mail Enable" → **Next**.
+   - **Post Office**: Enter `a3n4.com` and the domain password → **Next**.
+   - **SMTP**: Enter the domain name, DNS host, and SMTP port → **Next** → **Finish**.
+
+### Steps - Configure DNS & IIS Bindings
 
 ```Powershell
-Add-DnsServerResourceRecordA -Name "mail" -ZoneName "a3n4.com" -IPv4Address "192.168.56.10" -CreatePtr 
+Add-DnsServerResourceRecordA -Name "mail" -ZoneName "a3n4.com" -IPv4Address "172.18.18.180" -CreatePtr 
 Add-DnsServerResourceRecordCName -Name "autodiscover" -HostNameAlias "mail.a3n4.com" -ZoneName "a3n4.com"
-Add-DnsServerResourceRecord -ZoneName "a3n4.com" -Name "@" -Txt -DescriptiveText "v=spf1 ip4::192.168.56.10 a mx ptr include:mail.a3n4.com -all"
-Add-DnsServerResourceRecordA -Name "webmail" -ZoneName "a3n4.com" -IPv4Address "192.168.56.10" -CreatePtr
+Add-DnsServerResourceRecord -ZoneName "a3n4.com" -Name "@" -Txt -DescriptiveText "v=spf1 ip4:172.18.18.180 a mx ptr include:mail.a3n4.com -all"
+Add-DnsServerResourceRecordA -Name "webmail" -ZoneName "a3n4.com" -IPv4Address "172.18.18.180" -CreatePtr
 
 Restart-Service DNS
 Import-Module WebAdministration
 
-New-WebBinding -name "MailEnable WebMail" -IPAddress "192.168.56.10" -port 80 -HostHeader "mail.a3n4.com" -Protocol "http"
-New-WebBinding -name "MailEnable WebAdmin" -IPAddress "192.168.56.10" -port 80 -HostHeader "webmail.a3n4.com" -Protocol "http" 
+New-WebBinding -Name "MailEnable WebMail" -IPAddress "*" -Port 80 -HostHeader "mail.a3n4.com" -Protocol "http"
+New-WebBinding -Name "MailEnable WebAdmin" -IPAddress "*" -Port 80 -HostHeader "webmail.a3n4.com" -Protocol "http" 
 
 IISReset
 
-cd 'C:\Program Files (x86)\mail enable\postoffices\a3n4.com\mailroot'
+cd 'C:\Program Files (x86)\Mail Enable\Postoffices\a3n4.com\Mailroot'
 
-Add-PssNapin mailenable.provision.command
+Add-PSSnapin MailEnable.Provision.Command
 New-MailEnableMailBox -Domain "a3n4.com" -Mailboxes "AmmarShiddiq" -Password "#@amram3" -Right "ADMIN"
-New-MailEnableMailBox -domain "a3n4.com" -mailboxes "AriniSaputri" -password "#@rar1n" -rights "USER"
+New-MailEnableMailBox -Domain "a3n4.com" -Mailboxes "AriniSaputri" -Password "#@rar1n" -Rights "USER"
 
-cd ..\..\..\bin
+cd ..\..\..\Bin
 
 MEInstaller.exe SetDefaultMailServer -MailServer "mail.a3n4.com"
-MEInstaller.exe setpopalternateport -port 995 -requiressl
-MEInstaller.exe setimapalternateport -port 993 -requiressl 
+MEInstaller.exe SetPOPAlternatePort -Port 995 -RequireSSL
+MEInstaller.exe SetIMAPAlternatePort -Port 993 -RequireSSL
 ```
 
+### Steps - Remove
 
-## Steps Remove
 ```Powershell
-#Uninstall Mail Server
-
 Remove-DnsServerResourceRecord -ZoneName "a3n4.com" -RRType "A" -Name "mail" -Force
 Remove-DnsServerResourceRecord -ZoneName "a3n4.com" -RRType "A" -Name "webmail" -Force
 Remove-DnsServerResourceRecord -ZoneName "a3n4.com" -RRType "CNAME" -Name "autodiscover" -Force
@@ -977,14 +1002,15 @@ Remove-DnsServerResourceRecord -ZoneName "a3n4.com" -RRType "TXT" -Name "@" -For
 Remove-WebBinding -Name "MailEnable WebMail" -Port 80 -HostHeader "mail.a3n4.com"
 Remove-WebBinding -Name "MailEnable WebAdmin" -Port 80 -HostHeader "webmail.a3n4.com"
 
-Remove-Item "C:\Program Files (x86)\Mail Enable\"
+Remove-Item "C:\Program Files (x86)\Mail Enable\" -Recurse -Force
 
-# Cari Service yang masih tinggal -> Get-Service -DisplayName *mail*
-sc delete "NamaService"
+# Find remaining services: Get-Service -DisplayName *mail*
+sc delete "ServiceName"
 ```
 
-## Steps Verification
-### Server
+### Steps - Verification
+
+#### Server
 ```Powershell
 Get-DnsServerResourceRecord -ZoneName "a3n4.com" -Name "mail"
 Get-DnsServerResourceRecord -ZoneName "a3n4.com" -Name "webmail"
@@ -993,26 +1019,29 @@ Get-DnsServerResourceRecord -ZoneName "a3n4.com" -Name "@" -RRType TXT
 Get-WebBinding -Name "MailEnable WebMail"
 Get-WebBinding -Name "MailEnable WebAdmin"
 Get-Service -DisplayName *mail*
-
 ```
 
-
-### Client
-1. Login Client
-2. Buka Browser lalu ketik http://mail.a3n4.com
-3. Maka akan tampil halaman login mail enable
-4. Masukkan username admin dan password lalu klik login
-5. Klik New Email Message
-6. Masukkan email tujuan lalu klik send
-7. Logout Dari admin
-8. Masukkan username user dan password lalu klik login
-9. Klik Inbox
-10. Maka akan tampil email yang telah dikirim oleh admin
+#### Client
+1. Log in to the Client.
+2. Open a browser and visit `http://mail.a3n4.com`.
+3. The MailEnable login page will appear.
+4. Log in as the admin user (`AmmarShiddiq`).
+5. Click **New Email Message**, fill in the recipient and content, then click **Send**.
+6. Log out.
+7. Log in as the regular user (`AriniSaputri`).
+8. Open the **Inbox** — the email sent by the admin will be displayed.
 
 
 # VPN
+
 ## Function
-## Step Install
+### VPN (Virtual Private Network) - Secret Tunnel
+
+### Philosophy
+VPN creates a secure tunnel that connects your computer to the company network as if you were physically in the office. This allows you to access network resources securely from anywhere.
+
+### Steps - Create
+
 ```Powershell
 Install-WindowsFeature -Name RemoteAccess -IncludeManagementTools
 
@@ -1023,11 +1052,10 @@ Install-WindowsFeature -Name RSAT-RemoteAccess, DirectAccess-VPN, Routing, RSAT-
 Install-RemoteAccess -VpnType VPN
 
 Set-ADUser -Identity "AmmarShiddiq" -Replace @{msNPAllowDialin = $true}
-
-
 ```
 
-## Steps Remove
+### Steps - Remove
+
 ```Powershell
 Uninstall-WindowsFeature -Name DirectAccess-VPN, Routing, RSAT-RemoteAccess, RSAT-AD-Powershell
 
@@ -1038,8 +1066,9 @@ Uninstall-RemoteAccess -VpnType VPN
 Set-ADUser -Identity "AmmarShiddiq" -Replace @{msNPAllowDialin = $false}
 ```
 
-## Steps Verification
-### Server
+### Steps - Verification
+
+#### Server
 ```Powershell
 Get-WindowsFeature -Name RemoteAccess, RSAT-RemoteAccess, DirectAccess-VPN, Routing, RSAT-AD-Powershell
 
@@ -1051,16 +1080,15 @@ Get-ADUser -Identity "AmmarShiddiq" -Properties msNPAllowDialin | Select-Object 
 Get-ADUser -Filter * -Properties msNPAllowDialin | Select-Object Name, msNPAllowDialin
 ```
 
-### Client
-1. Login Client
-2. Klik kanan pada logo windows pilih run
-3. Ketik 'control.exe /name Microsoft.NetworkAndSharingCenter'
-4. Pada Window Network and Sharing Center Klik Set up a new connection or network
-5. Pilih Connect to a workplace lalu klik Next
-6. Pilih Use my Internet connection (VPN) lalu ill set up an internet connection later
-7. Pada Internet Address masukkan ip address server dan destination name
-8. Klik Create
-9. Klik logo internet bagian bawah
-10. Klik nama VPN yang telah dibuat lalu klik Connect
-11. Masukkan username dan password lalu klik Connect
-12. Maka akan terhubung ke VPN Server 
+#### Client
+1. Log in to the Client.
+2. Press `Win + R`, type `control.exe /name Microsoft.NetworkAndSharingCenter`, and press Enter.
+3. Click **Set up a new connection or network**.
+4. Select **Connect to a workplace** → **Next**.
+5. Select **Use my Internet connection (VPN)** → **I'll set up an internet connection later**.
+6. Enter the server's IP address and a destination name.
+7. Click **Create**.
+8. Click the network icon in the system tray.
+9. Click the VPN name → **Connect**.
+10. Enter the username and password → **Connect**.
+11. The client will now be connected to the VPN server.
