@@ -23,9 +23,6 @@ Add-DnsServerResourceRecordPtr -Name "10" -ZoneName "56.168.192.in-addr.arpa" -P
 
 Add-DnsServerResourceRecordA -Name "www" -ZoneName "a3n4.com" -Ipv4Address "192.168.56.10"
 
-# Add-DnsServerResourceRecordA -Name "a3n4_server" -ZoneName "a3n4.com" -Ipv4Address "192.168.56.10"
-
-# Add-DnsServerResourceRecordPtr -Name "10" -ZoneName "56.168.192.in-addr.arpa" -PtrDomainName "a3n4_server.a3n4.com"
 ```
 
 # Join Domain
@@ -65,6 +62,10 @@ Import-Module WebAdministration
 New-WebBinding -Name "a3n4web" -Protocol https -Port 443 -IpAddress "*" -HostHeader "a3n4.com"
 
 Get-Item "cert:\LocalMachine\My\CEEF3D52BC7E3A5E4DF6B30524EC5D3E9B0CC050" | New-Item "IIS:SslBindings\0.0.0.0!443!a3n4.com"
+```
+# IIS Two
+```powershell
+Install-WindowsFeature -Name Web-Server -IncludeManagementTools
 ```
 
 # Remote Desktop

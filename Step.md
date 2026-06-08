@@ -1,471 +1,297 @@
-# Ipset and other early step:
+# Windows Server Configuration Guide - A3N4
+
+## 1. IP Setup & Initial Configuration (SConfig)
+
+### Purpose
+Set the basic server configuration before building other services.
+
+### Philosophy
+Before building any system (Active Directory, DNS, File Server, etc.), the foundation must be stable. A server is like a headquarters — if the address keeps changing, no one will know where to go.
+
+### Steps - Configure
+
+1. Open SConfig:
+   ```
+   SConfig
+   ```
+
+   To auto-launch SConfig at every sign-in:
+   ```powershell
+   Set-SConfig -AutoLaunch $true
+   ```
+
+2. Select **2** to change the hostname, then enter the desired name.
+
+3. Select **3** to configure network settings.
+   - Enter the interface index (displayed when selecting this option)
+   - Select **1** to set the IP address
+   - Type **S** for static, then enter:
+     ```
+     172.18.18.180
+     ```
+   - Press Enter for subnet (default: 255.255.255.0)
+   - Leave the default gateway empty, then press Enter
+   - Select **2** to set the preferred DNS server, then enter:
+     ```
+     172.18.18.180
+     ```
+
+4. Select **13** to restart the computer.
+
+# ADDS
+
 ## Function
-### SConfig (IP Set) - Menentukan Koordinat Dasar
-**Filosofi**: Sebelum membangun gedung (Service), kita harus menentukan koordinat tanah yang tetap.
+### ADDS (Active Directory Domain Services) - Establishing the Government
 
-**Kenapa Server harus Static?** Karena server adalah pusat layanan. Jika alamat IP server berubah-ubah (DHCP), maka klien tidak akan pernah bisa menemukan di mana "kantor" pusatnya.
+### Philosophy
+Without AD DS, computers are isolated strangers to one another. AD DS provides official identities for users and computers, enabling centralized management, authentication, and authorization — just like a government issues IDs to its citizens.
 
-## Open SConfig
-Masuk ke dalam menu setting config:
-```command prompt
-SConfig
-```
-
-jika anda ingin sconfig jalan setiap kali sign in, ketik:
-```powershell
-set-sconfig -autoLaunch $true
-```
-
-## Langkah2 pada menu SConfig
-1. pilih 2 untuk mengubah hostname, dan isi sesuai yang diinginkan.
-
-2. pilih 3 untuk setting network, masukkan index ip, kemudian pilih 1 untuk set ip address, selanjutnya ketik S untuk static dan masukkan:
-    ```ip
-    192.168.56.10
-    ```
-    kemudian pada subnet tekan enter untuk pilih default 255.255.255.0, dan default gateway kosong, kemudian enter.   
-    <!-- then enter, after that chose 2 to set dns preferred and insert 
-    dns = 192.168.56.10 -->
-
-3. pilih 13 untuk restart komputer
-
-
-# Adds:
-## Function
-### ADDS (Active Directory) - Membentuk Pemerintahan
-**Filosofi**: Ini adalah momen kita mendirikan balai kota dan sistem kependudukan.
-
-**Kenapa harus ada ini?** Tanpa AD DS, komputer-komputer hanyalah individu yang asing satu sama lain. AD DS memberikan "identitas" resmi bagi user dan komputer.
-
-## Steps Create
+### Steps - Create
 ```PowerShell
-Install-windowsfeature -name AD-Domain-Services -includeManagementTools
-Install-ADDSForest -domainName "A3N4.com" -domainNetBiosName "A3N4" -safeModeAdministratorPassword (Convertto-SecureString "Aclsdmin123" -asplaintext -force)
+Install-WindowsFeature -Name AD-Domain-Services -IncludeManagementTools
+Install-ADDSForest -DomainName "A3N4.com" -DomainNetBiosName "A3N4" -SafeModeAdministratorPassword (ConvertTo-SecureString "Aclsdmin123" -AsPlainText -Force)
 ```
-## Steps Remove
-1. Uninstall Role AD DS
-    ```PowerShell
-    Uninstall-WindowsFeature AD-Domain-Services -IncludeManagementTools
-    ```
 
-## Steps Verification
+### Steps - Remove
+```PowerShell
+Uninstall-WindowsFeature AD-Domain-Services -IncludeManagementTools
+```
+
+### Steps - Verification
 ```PowerShell
 Get-WindowsFeature AD-Domain-Services
 Get-Service NTDS
 $env:USERDOMAIN
 ```
 
-# DHCP 
+# DHCP
+
 ## Function
-### DHCP - Bagian Administrasi Pendaftaran
-**Filosofi**: Memberikan nomor rumah secara otomatis kepada pendatang baru (klien).
+### DHCP (Dynamic Host Configuration Protocol) - Automatic Address Assignment
 
-**Kenapa ini penting?** Agar admin tidak perlu mendatangi setiap meja karyawan untuk mengatur IP manual. DHCP memastikan semua orang dapat "nomor" yang benar dan tidak bentrok.
+### Philosophy
+DHCP acts as an automatic registration desk. When a new client arrives, DHCP assigns them an IP address so they do not have to wait for manual configuration. This prevents IP conflicts and saves administration time.
 
-## Steps Create
-1. Instalasi Role DHCP
+### Steps - Create
+
 ```PowerShell
-Install-WindowsFeature DHCP -includeManagementTools
-Add-DHCPServerInDC -DNSName "a3n4.com" -IpAddress 192.168.56.10
-Add-DhcpServerV4Scope -Name "Scope-a3n4" -StartRange 192.168.56.11 -EndRange 192.168.56.20 -SubnetMask 255.255.255.0 -State Active
-Set-DHCPServerV4OptionValue -ScopeId 192.168.56.0 -Router 192.168.56.1
-Set-DHCPServerV4OptionValue -ScopeId 192.168.56.0 -DnsServer 192.168.56.10 -DnsDomain "a3n4.com"
-Set-DHCPServerV4Scope -ScopeId 192.168.56.0 -LeaseDuration ([TimeSpan]::FromDays(365))
+Install-WindowsFeature DHCP -IncludeManagementTools
+Add-DHCPServerInDC -DNSName "a3n4.com" -IpAddress 172.18.18.180
+Add-DhcpServerV4Scope -Name "Scope-a3n4" -StartRange 172.18.18.11 -EndRange 172.18.18.20 -SubnetMask 255.255.255.0 -State Active
+Set-DhcpServerV4OptionValue -ScopeId 172.18.18.0 -Router 172.18.18.1
+Set-DhcpServerV4OptionValue -ScopeId 172.18.18.0 -DnsServer 172.18.18.180 -DnsDomain "a3n4.com"
+Set-DhcpServerV4Scope -ScopeId 172.18.18.0 -LeaseDuration ([TimeSpan]::FromDays(365))
 ```
 
-## Steps Install & Connect Client
-1. Install Windows 10 dan sampai berhasil
-2. Set untuk adapter VM client dan juga server:
-    * internal network
-    * nama: a3n4.com
+### Steps - Client Setup
 
-3. Buka cmd dan ketik:
-    ```cmd
-    ipconfig
-    ```
-4. Untuk memastikan ip diset secara otomatis melalui server, ikuti langkah-langkah berikut:
-    1. tekan win+r lalu masukkan ncpa.cpl
-    2. klik kanan pada ethernet, lalu pilih properties
-    4. jika muncul jendela UAC, masukkan username password administrator
-    5. klik 2 kali pada baris internet protocol v4
-    6. pada jendela ip v4 pilih 
-        - obtain an ip address automatically
-        - obtain DNS server address automatically
-    4. klik ok lalu ok lagi
-5. Buka cmd atau powershell dan ketik:
-    ```powershell
-    ping a3n4.com
-    ping 192.168.56.10
-    ```
+1. Install Windows 10 on the client VM.
+2. Configure both server and client VM adapters:
+   - **Internal Network**
+   - **Name**: `a3n4.com`
+3. Open **cmd** and run:
+   ```cmd
+   ipconfig
+   ```
+4. Ensure the client obtains its IP automatically:
+   - Press `Win + R`, type `ncpa.cpl`
+   - Right-click **Ethernet** → **Properties**
+   - If prompted by UAC, enter admin credentials
+   - Double-click **Internet Protocol Version 4 (TCP/IPv4)**
+   - Select:
+     - **Obtain an IP address automatically**
+     - **Obtain DNS server address automatically**
+   - Click **OK** → **OK**
+5. Verify connectivity:
+   ```powershell
+   ping a3n4.com
+   ping 172.18.18.180
+   ```
 
-## Steps Verification
-1. Verifikasi Status Fitur & Service   
-Untuk memastikan role sudah terinstal dan layanannya benar-benar sedang berjalan (Running).
+### Steps - Verification
 
-    * Cek Fitur Windows:
+```PowerShell
+Get-WindowsFeature DHCP
+Get-Service DHCPServer
+Get-DhcpServerV4OptionValue -ScopeId 172.18.18.0
+Get-DhcpServerInDC
+Get-DhcpServerV4ScopeStatistics -ScopeId 172.18.18.0
+Get-DhcpServerV4Lease -ScopeId 172.18.18.0
+```
 
-        ```PowerShell
-        Get-WindowsFeature DHCP
-        ```
-        Pastikan statusnya sudah [X] Installed.
-        
-    * Cek Status Service:
+### Steps - Remove
 
-        ```PowerShell
-        Get-Service DHCPServer
-        ```
-        Tips: Jika statusnya Stopped, server tidak akan memberikan IP meski konfigurasi sudah benar.
+```powershell
+Remove-DhcpServerV4Scope -ScopeId 172.18.18.0 -Force
+Uninstall-WindowsFeature DHCP -IncludeManagementTools
+Remove-DhcpServerInDC -DNSName "a3n4.com" -IpAddress 172.18.18.180
+Restart-Computer
+```
 
-2. Verifikasi Konfigurasi Option (Gateway & DNS)   
-Tadi kamu sudah mengatur Router dan DnsServer. Untuk memastikan pengaturan tersebut sudah tersimpan di dalam scope:
+# DNS
 
-    * Cek Option yang Aktif:
-
-        ```PowerShell
-        Get-DhcpServerV4OptionValue -ScopeId 192.168.56.0
-        ```
-        Ini akan menampilkan daftar DNS, Gateway, dan Domain yang sudah kamu input tadi.
-
-3. Verifikasi Otorisasi di Active Directory
-Untuk memastikan server kamu sudah diizinkan beroperasi di dalam domain:
-
-    * Cek Daftar Server Terotorisasi:
-
-        ```PowerShell
-        Get-DhcpServerInDC
-        ```
-
-4. Verifikasi Statistik & Penggunaan IP
-Jika nanti sudah ada perangkat yang terhubung, kamu bisa memantau berapa IP yang tersisa dan siapa saja yang sudah meminjam IP.
-
-    * Cek Statistik Scope (Persentase penggunaan):
-
-        ```PowerShell
-        Get-DhcpServerV4ScopeStatistics -ScopeId 192.168.56.0
-        ```
-
-    * Cek Daftar Klien yang Mendapat IP:
-
-        ```PowerShell
-        Get-DhcpServerV4Lease -ScopeId 192.168.56.0
-        ```
-
-## Steps Remove
-1. Hapus Konfigurasi DHCP (Scope & Otorisasi)
-Langkah pertama adalah menghapus scope yang sudah dibuat dan mencabut otorisasi server dari Active Directory.
-
-    * Menghapus Scope:
-        Gunakan -ScopeId (alamat network-nya).
-
-        ```powershell
-        Remove-DhcpServerV4Scope -ScopeId 192.168.56.0 -Force
-        ```
-
-    * Mencabut Otorisasi Server di DC:
-
-        ```powershell
-        Uninstall-WindowsFeature DHCP -IncludeManagementTools
-        ```
-2. Hapus Fitur (Role) DHCP
-Setelah konfigurasi bersih, kamu bisa menghapus role DHCP dari Windows Server.   
-    
-    Uninstall Role dan Tools:
-
-    ```powershell
-    Remove-DhcpServerInDC -DNSName "a3n4.com" -IpAddress 192.168.56.10
-    ```
-3. Restart Server (Penting)
-Menghapus role Windows biasanya memerlukan restart agar pembersihan file sistem selesai sepenuhnya. Kamu bisa melakukannya via PowerShell:
-
-    ```powershell
-    Restart-Computer
-    ```
-
-# DNS 
 ## Function
-### DNS - Buku Telepon Kota
-**Filosofi**: Manusia sulit menghafal koordinat (IP), kita lebih mudah hafal nama (www.a3n4.com).
+### DNS (Domain Name System) - The Network Phonebook
 
-**Kenapa ini penting?** DNS adalah penghubung. Tanpa DNS, komputer klien tidak akan pernah tahu kalau nama domain a3n4.com itu sebenarnya berada di alamat 192.168.56.10.
+### Philosophy
+Humans find it difficult to remember numbers (IP addresses); we are far better at remembering names. DNS translates human-friendly domain names (like `www.a3n4.com`) into machine-readable IP addresses. Without DNS, clients would never know that `a3n4.com` lives at `172.18.18.180`.
 
-## Steps Create 
-Langkah ini fokus pada instalasi role DNS serta pembuatan Reverse Lookup Zone dan Record (data host).
+### Steps - Create
 
-1. Instalasi Role DNS
+```PowerShell
+Install-WindowsFeature -Name DNS -IncludeManagementTools
 
-    ```PowerShell
-    Install-WindowsFeature -Name DNS -IncludeManagementTools
-    ```
-    Penjelasan: Mengaktifkan layanan DNS Server pada Windows. Sama seperti DHCP, -IncludeManagementTools dipasang agar kamu punya akses ke DNS Manager (GUI) dan perintah PowerShell terkait.
+Add-DnsServerPrimaryZone -NetworkId "172.18.18.0/24" -ZoneFile "18.18.172.in-addr.arpa.dns"
 
-2. Membuat Reverse Lookup Zone
+Add-DnsServerResourceRecordPtr -Name "180" -ZoneName "18.18.172.in-addr.arpa" -PtrDomainName "www.a3n4.com"
 
-    ```PowerShell
-    Add-DnsServerPrimaryZone -NetworkId "192.168.56.0/24" -ZoneFile "56.168.192.in-addr.arpa.dns"
-    ```
-    Penjelasan: Membuat zona pencarian terbalik. Jika biasanya DNS mencari IP dari nama (Forward), zona ini memungkinkan server mencari nama berdasarkan alamat IP. Sangat berguna untuk keamanan dan diagnosa jaringan.
+Add-DnsServerResourceRecordA -Name "www" -ZoneName "a3n4.com" -IPv4Address "172.18.18.180"
+```
 
-3. Membuat Record PTR (Pointer)
+### Steps - Remove
 
-    ```PowerShell
-    Add-DnsServerResourceRecordPtr -Name "10" -ZoneName "56.168.192.in-addr.arpa" -PtrDomainName "www.a3n4.com"
-    ```
-    Penjelasan: Menambahkan data ke dalam Reverse Lookup Zone tadi. Ini menyatakan bahwa IP akhir .10 (dari network 192.168.56.0) adalah milik www.a3n4.com.
+```PowerShell
+Remove-DnsServerResourceRecord -Name "www" -ZoneName "a3n4.com" -RRType A -Force
+Remove-DnsServerResourceRecord -Name "180" -ZoneName "18.18.172.in-addr.arpa" -RRType PTR -Force
+Remove-DnsServerZone -Name "18.18.172.in-addr.arpa" -Force
+Remove-WindowsFeature -Name DNS -IncludeManagementTools
+```
 
-4. Membuat Record A (Address)
+### Steps - Verification
 
-    ```PowerShell
-    DnsCmd /recordAdd a3n4.com www A 192.168.56.10
-
-    Add-DnsServerResourceRecordA -Name "www" -ZoneName "a3n4.com" -Ipv4Address "192.168.56.10
-    ```
-    Penjelasan:     
-                - `Add-DnsServerResourceRecordA`: Fungsi utama untuk menambah rekaman alamat IPv4 (Record A).   
-                - `-Name "www"`: Menentukan nama host atau subdomain yang ingin dibuat.     
-                - `-ZoneName "a3n4.com"`: Nama domain utama tempat rekaman ini akan disimpan.     
-                - `-IPv4Address "192.168.56.10"`: Alamat IP tujuan yang akan dituju saat seseorang memanggil nama www.a3n4.com.    
-
-## Remove Step
-1. Hapus Record A
-    ```PowerShell
-    Remove-DnsServerResourceRecord -Name "www" -ZoneName "a3n4.com" -RRType A -Force
-    ```
-2. Hapus Record PTR
-    ```PowerShell
-    Remove-DnsServerResourceRecord -Name "10" -ZoneName "56.168.192.in-addr.arpa" -RRType PTR -Force
-    ```
-3. Hapus Reverse Lookup Zone
-    ```PowerShell
-    Remove-DnsServerZone -Name "56.168.192.in-addr.arpa" -Force
-    ```
-4. Uninstall
-    ```PowerShell
-    Remove-WindowsFeature -Name DNS -IncludeManagementTools
-    ```
-
-## Verification Steps
-Setelah dikonfigurasi, kamu harus memastikan server mengenali zona tersebut dan klien bisa menjangkaunya.
-
-1. Verifikasi di Sisi Server
-    * Cek Daftar Zone:
-
-        ```PowerShell
-        Get-DnsServerZone
-        ```
-        Memastikan zona a3n4.com dan zona in-addr.arpa (Reverse) berstatus "Primary" dan aktif.
-
-    * Cek Isi Record:
-
-        ```PowerShell
-        Get-DnsServerResourceRecord -ZoneName "a3n4.com"
-        ```
-        Melihat apakah nama www sudah muncul di daftar beserta IP-nya.
-
-2. Verifikasi di Sisi Klien
-    * Ping Test:
-
-        ```PowerShell
-        ping www.a3n4.com
-        ```
-        Jika berhasil, berarti sistem operasi sudah bisa mengenali nama tersebut.
-
-    * Lookup Test:
-
-        ```PowerShell
-        nslookup www.a3n4.com
-        ```
-        Ini adalah tes murni DNS. Ia akan menampilkan server mana yang menjawab dan IP berapa yang diberikan. Ini cara paling akurat untuk memastikan DNS bekerja.
+```PowerShell
+Get-DnsServerZone
+Get-DnsServerResourceRecord -ZoneName "a3n4.com"
+ping www.a3n4.com
+nslookup www.a3n4.com
+```
 
 # Join Domain
+
 ## Function
-### Join Domain - Menjadi Warga Negara Resmi
-**Filosofi**: Setelah jalurnya ada (IP), namanya terdaftar (DNS), dan dapet nomor urut (DHCP), barulah klien mendaftarkan diri menjadi "Warga Negara" resmi di bawah naungan Server.
+### Join Domain - Becoming an Official Domain Citizen
 
-**Kenapa ini langkah terakhir?** Karena untuk Join Domain, klien butuh jalur komunikasi yang matang. Jika DNS atau IP salah, klien tidak akan pernah bisa "mengetuk pintu" Server.
+### Philosophy
+After the network path is ready (IP), the name is registered (DNS), and automatic addressing is in place (DHCP), the client can finally register itself as an official member of the domain. This is the last step because the client needs a fully functional communication channel — if DNS or IP is misconfigured, the client can never "knock on the server's door."
 
-### Why
-Join Domain adalah proses memasukkan komputer ke dalam sebuah "keluarga" atau sistem manajemen terpusat. Berikut gunanya:
+### Steps - Create
 
-1. Satu Akun untuk Semua Komputer (Single Sign-On)   
-Tanpa Domain, kamu harus buat akun di tiap PC. Dengan Domain, kamu cukup buat satu user di Server (Active Directory), dan user itu bisa login di PC mana pun yang sudah join domain.
+1. Log in to the Windows Client (must be Windows Pro/Enterprise).
+2. Press `Win + R`, type `sysdm.cpl` to open **System Properties**.
+3. Click **Change** (bottom-right section).
+4. Select **Domain** and enter the domain name:
+   ```
+   A3N4.com
+   ```
+5. Click **OK** — a credential window will appear.
+6. Enter domain administrator credentials to authorize the join, then click **OK**.
+7. Restart the client when prompted.
 
-2. Pengaturan Terpusat (Group Policy / GPO)   
-Ini yang paling sakti. Kamu bisa mengatur semua komputer dari satu layar Server. Contohnya:
-Melarang semua karyawan ganti wallpaper.
-Mematikan fungsi USB Flashdisk di semua PC agar aman dari virus.
-Otomatis install aplikasi ke 100 komputer sekaligus tanpa mendatangi PC-nya satu per satu.
+### Steps - Remove
 
-3. Keamanan & Hak Akses   
-Jika kamu punya File Server (folder sharing), kamu bisa mengatur dengan sangat detail: "Hanya divisi Keuangan yang boleh buka folder Gaji, divisi lain tidak bisa klik sama sekali." Ini jauh lebih aman daripada sharing folder biasa (Workgroup).
+1. Log in to the Windows Client.
+2. Press `Win + R`, type `sysdm.cpl` to open **System Properties**.
+3. Click **Change** (bottom-right section).
+4. Select **Workgroup** and enter a workgroup name (e.g., `WORKGROUP`).
+5. Click **OK** — a credential window will appear.
+6. Enter domain administrator credentials to authorize the removal, then click **OK**.
+7. Restart the client when prompted.
 
-4. Inventori & Monitoring   
-Server akan mencatat semua komputer yang tergabung. Kamu jadi tahu komputer mana yang sedang aktif, siapa yang sedang login, dan kapan terakhir mereka ganti password.  
+### Steps - Verification
 
-Gampangnya begini:
-DNS & DHCP = Jalur kabel dan pemberian nomor rumah agar bisa saling panggil.
-Join Domain = Aturan hukum dan sistem kependudukan agar semuanya patuh pada satu pimpinan (Server).
-
-## Steps Create
-1. Login Windows Client (Pastikan Windows Pro)
-2. Klik win+r lalu masukkan `sysdm.cpl` untuk masuk ke system properties
-3. pilih change dibagian bawah kanan
-4. Pilih Domain lalu masukkan nama domainnya
-5. Klik ok maka muncul window untuk meminta masukkan credential
-6. Masukkan username dan password domain untuk memberi izin, lalu klik ok
-7. Restart Client
-
-## Steps Remove
-1. Login Windows Client
-2. Klik win+r lalu masukkan `sysdm.cpl` untuk masuk ke system properties
-3. pilih change dibagian bawah kanan
-4. Pilih Workgroup lalu masukkan nama workgroup (misal: WORKGROUP)
-5. Klik ok maka muncul window untuk meminta masukkan credential
-6. Masukkan username dan password domain untuk memberi izin, lalu klik ok
-7. Restart Client
-
-## Steps Verification
-1. Login Windows Client
-2. Klik win+r lalu masukkan `ncpa.cpl` 
-3. klik dua kali pada ethernet
-4. Pada status ethernet window klik details
-5. Pastikan client sudah menunjuk ip address ke dhcp dan dns server ke domain
+1. Log in to the Windows Client.
+2. Press `Win + R`, type `ncpa.cpl`.
+3. Double-click **Ethernet**.
+4. In the **Ethernet Status** window, click **Details**.
+5. Verify that:
+   - **IPv4 Address** is assigned by DHCP (from the server scope)
+   - **DNS Server** points to the domain server (`172.18.18.180`)
 
 # User & Group
+
 ## Function
-Jika Domain adalah sebuah kantor besar, maka:
+If a domain is a large office, then:
 
-1. Organizational Unit (OU): Ibarat sebuah Gedung atau Ruangan. Gunanya untuk merapikan database AD agar tidak berantakan. Tanpa OU, semua user akan tercampur di satu folder besar.
+1. **Organizational Unit (OU)** — Like a building or room. It organizes the AD database so everything is not mixed together in one big folder.
 
-2. User: Ibarat Kunci Masuk. Setiap karyawan punya kunci (username/password) unik. Ini memastikan kita tahu "siapa melakukan apa" di dalam jaringan.
+2. **User** — Like a key. Each employee has a unique key (username/password). This ensures we know "who did what" on the network.
 
-3. Group: Ibarat Akses Khusus. Daripada memberikan izin satu per satu ke 100 orang, kita cukup masukkan 100 orang itu ke kelompok "Finance", lalu kelompok "Finance" kita beri akses ke folder gaji. Jauh lebih cepat dan efisien.
+3. **Group** — Like access badges. Instead of granting permissions one by one to 100 people, we put them into groups (e.g., "Finance") and grant permissions to the group. Much faster and more efficient.
 
-## Steps Create
-1. Membuat Organizational Unit (OU)
+### Steps - Create
 
-    ```PowerShell
-    New-AdOrganizationalUnit -Name "a3n4_Staff" -Path "DC=a3n4, DC=com"
-    ```
-    * Penjelasan: Membuat wadah bernama a3n4_Staff.
+1. **Create an Organizational Unit (OU)**
 
-    * Parameter: -Path menjelaskan di mana wadah ini berada (di dalam root domain a3n4.com).
+   ```PowerShell
+   New-AdOrganizationalUnit -Name "a3n4_Staff" -Path "DC=a3n4, DC=com"
+   ```
 
-2. Membuat Security Group
+2. **Create Security Groups**
 
-    ```PowerShell
-    # Contoh
-    New-AdGroup -Name "HR_Staff" -GroupScope Global -Path "OU=a3n4_Staff, DC=a3n4, DC=com" -GroupCategory Security
+   ```PowerShell
+   New-AdGroup -Name "All_Staff" -GroupScope Global -Path "OU=a3n4_Staff, DC=a3n4, DC=com" -GroupCategory Security
+   New-AdGroup -Name "Finance_Staff" -GroupScope Global -Path "OU=a3n4_Staff, DC=a3n4, DC=com" -GroupCategory Security
+   New-AdGroup -Name "HR_Staff" -GroupScope Global -Path "OU=a3n4_Staff, DC=a3n4, DC=com" -GroupCategory Security
+   New-AdGroup -Name "Marketing_Staff" -GroupScope Global -Path "OU=a3n4_Staff, DC=a3n4, DC=com" -GroupCategory Security
+   ```
 
-    # Isi
-    New-AdGroup -Name "All_Staff" -GroupScope Global -Path "OU=a3n4_Staff, DC=a3n4, DC=com" -GroupCategory Security
-    New-AdGroup -Name "Finance_Staff" -GroupScope Global -Path "OU=a3n4_Staff, DC=a3n4, DC=com" -GroupCategory Security
-    New-AdGroup -Name "HR_Staff" -GroupScope Global -Path "OU=a3n4_Staff, DC=a3n4, DC=com" -GroupCategory Security
-    New-AdGroup -Name "Marketing_Staff" -GroupScope Global -Path "OU=a3n4_Staff, DC=a3n4, DC=com" -GroupCategory Security
-    ```
-    * Penjelasan: Membuat kelompok departemen.
+3. **Create User Accounts**
 
-    * Parameter: -GroupScope Global berarti grup ini bisa digunakan di seluruh domain, dan -GroupCategory Security berarti grup ini bisa digunakan untuk mengatur hak akses folder/file.
+   ```PowerShell
+   New-ADUser -Name "Ammar" -GivenName "Ammar" -Surname "" -SamAccountName "Ammar" -UserPrincipalName "Ammar@a3n4.com" -Path "OU=a3n4_Staff,DC=a3n4,DC=com" -AccountPassword (ConvertTo-SecureString "##ammarTi2b" -AsPlainText -Force) -Enabled $true
 
-3. Membuat Akun User
+   New-AdUser -Name "Nailis Saputri" -GivenName "Nailis" -Surname "Saputri" -SamAccountName "NailisSaputri" -UserPrincipalName "NailisSaputri@a3n4.com" -Path "OU=a3n4_Staff, DC=a3n4, DC=com" -AccountPassword (ConvertTo-SecureString "##nailisTi2b" -AsPlainText -Force) -Enabled $true
 
-    ```PowerShell
-    # Contoh 
-    New-ADUser -Name "Ammar" -SamAccountName "Ammar" -AccountPassword (...) -Enabled $true
+   New-ADUser -Name "Dhiyaul Atha" -GivenName "Dhiyaul" -Surname "Atha" -SamAccountName "DhiyaulAtha" -UserPrincipalName "DhiyaulAtha@a3n4.com" -Path "OU=a3n4_Staff,DC=a3n4,DC=com" -AccountPassword (ConvertTo-SecureString "##athaTi2b" -AsPlainText -Force) -Enabled $true
 
-    # Isi
-    # Ammar
-    New-ADUser -Name "Ammar" -GivenName "Ammar" -Surname "" -SamAccountName "Ammar" -UserPrincipalName "Ammar@a3n4.com" -Path "OU=a3n4_Staff,DC=a3n4,DC=com" -AccountPassword (ConvertTo-SecureString "##ammarTi2b" -AsPlainText -Force) -Enabled $true
+   New-ADUser -Name "Naiza Fitri" -GivenName "Naiza" -Surname "Fitri" -SamAccountName "NaizaFitri" -UserPrincipalName "NaizaFitri@a3n4.com" -Path "OU=a3n4_Staff,DC=a3n4,DC=com" -AccountPassword (ConvertTo-SecureString "##naizaTi2b" -AsPlainText -Force) -Enabled $true
 
-    #Nailis Saputri
-    New-AdUser -Name "Nailis Saputri" -GivenName "Nailis" -Surname "Saputri" -SamAccountName "NailisSaputri" -UserPrincipalName "NailisSaputri@a3n4.com" -Path "OU=a3n4_Staff, DC=a3n4, DC=com" -AccountPassword (ConvertTo-SecureString "##nailisTi2b" -AsPlainText -Force) -Enabled $true
+   New-ADUser -Name "Nayla Mutia" -GivenName "Nayla" -Surname "Mutia" -SamAccountName "NaylaMutia" -UserPrincipalName "NaylaMutia@a3n4.com" -Path "OU=a3n4_Staff,DC=a3n4,DC=com" -AccountPassword (ConvertTo-SecureString "##naylaTi2b" -AsPlainText -Force) -Enabled $true
 
-    # Dhiyaul Atha
-    New-ADUser -Name "Dhiyaul Atha" -GivenName "Dhiyaul" -Surname "Atha" -SamAccountName "DhiyaulAtha" -UserPrincipalName "DhiyaulAtha@a3n4.com" -Path "OU=a3n4_Staff,DC=a3n4,DC=com" -AccountPassword (ConvertTo-SecureString "##athaTi2b" -AsPlainText -Force) -Enabled $true
+   New-ADUser -Name "Nikmal Wakil" -GivenName "Nikmal" -Surname "Wakil" -SamAccountName "NikmalWakil" -UserPrincipalName "NikmalWakil@a3n4.com" -Path "OU=a3n4_Staff,DC=a3n4,DC=com" -AccountPassword (ConvertTo-SecureString "##nikmalTi2b" -AsPlainText -Force) -Enabled $true
 
-    # Naiza Fitri
-    New-ADUser -Name "Naiza Fitri" -GivenName "Naiza" -Surname "Fitri" -SamAccountName "NaizaFitri" -UserPrincipalName "NaizaFitri@a3n4.com" -Path "OU=a3n4_Staff,DC=a3n4,DC=com" -AccountPassword (ConvertTo-SecureString "##naizaTi2b" -AsPlainText -Force) -Enabled $true
+   New-ADUser -Name "Arini Safitri" -GivenName "Arini" -Surname "Safitri" -SamAccountName "AriniSafitri" -UserPrincipalName "AriniSafitri@a3n4.com" -Path "OU=a3n4_Staff,DC=a3n4,DC=com" -AccountPassword (ConvertTo-SecureString "##ariniTi2b" -AsPlainText -Force) -Enabled $true
+   ```
 
-    # Nayla Mutia
-    New-ADUser -Name "Nayla Mutia" -GivenName "Nayla" -Surname "Mutia" -SamAccountName "NaylaMutia" -UserPrincipalName "NaylaMutia@a3n4.com" -Path "OU=a3n4_Staff,DC=a3n4,DC=com" -AccountPassword (ConvertTo-SecureString "##naylaTi2b" -AsPlainText -Force) -Enabled $true
+4. **Add Users to Groups**
 
-    # Nikmal Wakil
-    New-ADUser -Name "Nikmal Wakil" -GivenName "Nikmal" -Surname "Wakil" -SamAccountName "NikmalWakil" -UserPrincipalName "NikmalWakil@a3n4.com" -Path "OU=a3n4_Staff,DC=a3n4,DC=com" -AccountPassword (ConvertTo-SecureString "##nikmalTi2b" -AsPlainText -Force) -Enabled $true
+   ```PowerShell
+   Add-AdGroupMember -Identity "HR_Staff" -Members "Ammar"
+   Add-AdGroupMember -Identity "Finance_Staff" -Members "NailisSaputri"
+   Add-AdGroupMember -Identity "Marketing_Staff" -Members "DhiyaulAtha"
+   # Add other users to their respective groups as needed
+   ```
 
-    # Arini Safitri
-    New-ADUser -Name "Arini Safitri" -GivenName "Arini" -Surname "Safitri" -SamAccountName "AriniSafitri" -UserPrincipalName "AriniSafitri@a3n4.com" -Path "OU=a3n4_Staff,DC=a3n4,DC=com" -AccountPassword (ConvertTo-SecureString "##ariniTi2b" -AsPlainText -Force) -Enabled $true
-    ```
-    * Penjelasan: Mendaftarkan individu ke dalam sistem.
+### Steps - Remove
 
-    * Parameter Penting:
+```PowerShell
+Remove-ADUser -Identity "Nama_User"
+Remove-ADGroup -Identity "Nama_Group"
+Remove-ADOrganizationalUnit -Identity "OU=a3n4_Staff,DC=a3n4,DC=com"
+```
 
-        * -SamAccountName: Nama yang digunakan untuk login (misal: Ammar).
+### Steps - Verification
 
-        * -UserPrincipalName: Format login email (Ammar@a3n4.com).
-
-        * -AccountPassword: Memberikan password awal yang sudah di-enkripsi.
-
-        * -Enabled $true: Memastikan akun langsung aktif dan bisa digunakan untuk login.
-
-4. Aktivasi User (Opsional)
-
-    ```PowerShell
-    # Jika tidak memakai -Enabled $true maka harus mengaktifkan user secara manual dengan perintah berikut:
-    Enable-ADAccount -Identity "Ammar" 
-    # Atau untuk seluruh user dengan satu command:
-    Get-ADUser -Filter * -SearchBase "OU=a3n4_Staff,DC=a3n4,DC=com" | Enable-ADAccount
-    ```
-    Penjelasan: Perintah borongan untuk mengaktifkan semua user yang ada di dalam OU tersebut jika saat pembuatan lupa menambahkan -Enabled $true.
-
-5. Memasukkan User ke Group (Membership)
-
-    ```PowerShell
-    Add-AdGroupMember -Identity "Nama_Group" -Members "Nama_User"
-    ```
-    Penjelasan: Menghubungkan user dengan departemennya. Setelah ini dijalankan, user tersebut otomatis mendapatkan semua hak akses yang dimiliki oleh grup tersebut.
-
-## Remove Step
-1. Hapus User
-    ```PowerShell
-    Remove-ADUser -Identity "Nama_User"
-    ```
-2. Hapus Group
-    ```PowerShell
-    Remove-ADGroup -Identity "Nama_Group"
-    ```
-3. Hapus OU
-    ```PowerShell
-    Remove-ADOrganizationalUnit -Identity "OU=a3n4_Staff,DC=a3n4,DC=com"
-    ```
-
-## Verification Step
- 
 ```PowerShell
 Get-ADOrganizationalUnit -Filter *
-
 Get-ADGroup -Filter * -SearchBase "OU=a3n4_Staff,DC=a3n4,DC=com"
-
 Get-ADUser -Filter * -SearchBase "OU=a3n4_Staff,DC=a3n4,DC=com"
-
-Get-ADGroupMember -Identity "Nama_Group"
-```
-Fungsi: Menampilkan daftar siapa saja yang sudah berhasil masuk ke dalam grup All_Staff. Jika nama-nama user yang kamu buat tadi muncul di sini, berarti konfigurasi berhasil.
-
-Tips Wit: Ingat, memberikan password yang sama ke semua user (##ammarTi2b, dll) itu memudahkan saat praktik, tapi di dunia nyata, biasanya kita pakai opsi ChangePasswordAtLogon supaya mereka ganti password sendiri saat pertama kali masuk!
-Contoh:
-```powershell
-New-ADUser -Name "Arini Safitri" -GivenName "Arini" -Surname "Safitri" -SamAccountName "AriniSafitri" -UserPrincipalName "AriniSafitri@a3n4.com" -Path "OU=a3n4_Staff,DC=a3n4,DC=com" -AccountPassword (ConvertTo-SecureString "##ariniTi2b" -AsPlainText -Force) -Enabled $true -ChangePasswordAtLogon $true
+Get-ADGroupMember -Identity "All_Staff"
 ```
 # IIS
-## Function
-### IIS (Internet Information Services) - Membangun Toko Online
-**Filosofi**: Setelah semua infrastruktur siap, sekarang saatnya kita membuka "toko online" agar dunia bisa mengakses layanan yang kita tawarkan.
-**Kenapa ini penting?** Tanpa IIS, server kamu hanyalah komputer biasa. Dengan IIS, kamu bisa membuat website, aplikasi web, atau layanan online yang bisa diakses dari mana saja.
 
-## Steps Create
+## Function
+### IIS (Internet Information Services) - Opening an Online Store
+
+### Philosophy
+After all infrastructure is ready, it is time to open an "online store" so the world can access the services we offer. Without IIS, the server is just an ordinary computer. With IIS, you can host websites, web applications, or online services accessible from anywhere.
+
+### Steps - Create
+
 ```Powershell
 Install-WindowsFeature -Name Web-Server -IncludeManagementTools
 
-New-Item -Path "C:\inetpub\a3n4web" -ItemType directory
+New-Item -Path "C:\inetpub\a3n4web" -ItemType Directory
 
 New-Website -Name "a3n4web" -Port 80 -IpAddress "*" -HostHeader "a3n4.com" -PhysicalPath "C:\inetpub\a3n4web"
 
@@ -477,86 +303,310 @@ New-SelfSignedCertificate -DnsName "a3n4.com" -CertStoreLocation "cert:\LocalMac
 
 Import-Module WebAdministration
 
-New-WebBinding -Name "a3n4web" -Protocol https -port 443 -IpAddress "*" -HostHeader "a3n4.com"
+New-WebBinding -Name "a3n4web" -Protocol https -Port 443 -IpAddress "*" -HostHeader "a3n4.com"
 
 Get-Item "cert:\LocalMachine\My\<ThumbPrint>" | New-Item "IIS:SslBindings\0.0.0.0!443!a3n4.com"
-
 ```
-## Steps Remove
+
+### Steps - Remove
+
 ```Powershell
 Remove-Website -Name "a3n4web"
-
 Remove-Item "IIS:\SslBindings\0.0.0.0!443!a3n4.com" -ErrorAction SilentlyContinue
-
 Remove-Item -Path "C:\inetpub\a3n4web" -Recurse -Force
-
 Get-ChildItem Cert:\LocalMachine\My | Where-Object {$_.Subject -eq "CN=a3n4.com"} | Remove-Item
-
-# Optional (kalau yakin mau hapus IIS total)
-# Remove-WindowsFeature Web-Static-Content
-# Remove-WindowsFeature Web-Server -IncludeManagementTools
 ```
 
-## Steps Verification
-### Server
+### Steps - Verification
+
+#### Server
 ```Powershell
 Get-WindowsFeature Web-Server
 Get-Website -Name "a3n4web"
 Get-WebBinding -Name "a3n4web"
 ```
 
-### Client
-1. Login Client
-2. Ketik http://a3n4.com untuk masuk ke IIS web
-3. Maka akan berhasil ke web
-4. Ketik https://a3n4.com untuk masuk ke IIS Certificate
-5. Maka akan tampil "Your Connection Isn't Private"
-6. Klik Advanced lalu continue to a3n4.com (unsafe)
-7. Maka berhasil masuk ke IISC
+#### Client
+1. Log in to the Client.
+2. Visit `http://a3n4.com` to access the IIS website.
+3. Visit `https://a3n4.com` to test HTTPS.
+4. A "Your Connection Isn't Private" warning will appear.
+5. Click **Advanced** → **Continue to a3n4.com (unsafe)**.
+6. The site will load successfully.
 
+# IIS - Laravel
+
+## Function
+### Running a Laravel Application on IIS
+
+### Philosophy
+A Laravel application turns your IIS server into a full-stack web development platform. With PHP, MySQL, Composer, and Node.js, you can deploy modern web applications that integrate with your Active Directory domain.
+
+### Steps - Prerequisites
+
+Prepare the following installer files:
+
+| File | Purpose |
+|------|---------|
+| `Composer-Setup.exe` | PHP dependency manager |
+| `group_manage.sql` | Project database |
+| `group-manage.zip` | Laravel project files |
+| `mysql-8.0.46-winx64.zip` | MySQL database |
+| `node-v22.17.1-x64.msi` | Node.js & npm |
+| `php-8.4.12-Win32-vs17-x64.zip` | PHP interpreter |
+| `rewrite_amd64_en-US.msi` | URL Rewrite module |
+| `VC_redist.x64.exe` | Visual C++ Redistributable |
+| `web.config` | IIS rewrite configuration |
+
+### Steps - Install
+
+#### 1. PHP Setup
+
+```powershell
+# Extract PHP
+mkdir c:\php
+Expand-Archive -Path "php.zip" -DestinationPath "c:\php"
+
+# Add to PATH
+$path = [System.Environment]::GetEnvironmentVariable("Path", "User")
+[System.Environment]::SetEnvironmentVariable("Path", "$path;C:\php", "User")
+
+# Verify
+php -v
+```
+
+Edit `C:\php\php.ini` and uncomment these extensions:
+```ini
+extension=fileinfo
+extension=mbstring
+extension=openssl
+extension=pdo_mysql
+extension=mysqli
+extension=curl
+extension=zip
+```
+
+#### 2. MySQL Setup
+
+```powershell
+# Extract MySQL
+mkdir c:\mysql
+Expand-Archive -Path "mysql.zip" -DestinationPath "c:\mysql"
+
+# Add to PATH
+$path = [System.Environment]::GetEnvironmentVariable("Path", "User")
+[System.Environment]::SetEnvironmentVariable("Path", "$path;C:\mysql\bin", "User")
+
+# Verify
+mysql --version
+```
+
+Create `C:\mysql\my.ini`:
+```ini
+[mysqld]
+basedir=C:/MYSQL
+datadir=C:/MYSQL/data
+port=3306
+
+[client]
+port=3306
+```
+
+Initialize and install MySQL:
+```powershell
+mkdir c:\mysql\data
+mysqld --initialize-insecure --basedir=C:\mysql --datadir=C:\mysql\data
+mysqld --install MySQL --defaults-file=C:\mysql\my.ini
+Start-Service MySQL
+```
+
+Import the project database:
+```cmd
+mysql -u root -e "create database group_manage"
+mysql -u root group_manage < z:/iis-laravel/group_manage.sql
+```
+
+#### 3. Install Supporting Software
+
+Run each installer:
+- `VC_redist.x64.exe`
+- `rewrite_amd64_en-US.msi`
+- `Composer-Setup.exe` (ensure internet/NAT is active)
+- `node-v22.17.1-x64.msi`
+
+#### 4. IIS Configuration
+
+```powershell
+# Install IIS features
+Install-WindowsFeature -Name Web-Server -IncludeManagementTools
+Install-WindowsFeature -Name Web-CGI
+Install-WindowsFeature -Name Web-Static-Content
+
+# Configure FastCGI for PHP
+Import-Module WebAdministration
+Add-WebConfiguration -Filter /system.webServer/fastCgi -value @{fullpath='C:\php\php-cgi.exe'}
+New-WebHandler -Name PHP-FastCGI -Path "*.php" -Verb "*" -Modules FastCgiModule -ScriptProcessor "C:\php\php-cgi.exe"
+```
+
+#### 5. Deploy Laravel Project
+
+```powershell
+# Extract project
+Expand-Archive -Path "group-manage.zip" -DestinationPath "c:\inetpub\group-manage"
+
+# Create DNS record
+Add-DnsServerResourceRecordA -Name "group-manage" -ZoneName "a3n4.com" -IPv4Address "172.18.18.180"
+
+# Create IIS website
+Import-Module WebAdministration
+New-WebSite -Name "group-manage" -Port 80 -HostHeader "group-manage.a3n4.com" -PhysicalPath "C:\inetpub\group-manage\public"
+
+# Create and assign application pool
+New-WebAppPool -Name "group-manage"
+Set-ItemProperty -Path "IIS:\Sites\group-manage" -Name applicationPool -Value "group-manage"
+
+# Set permissions
+icacls "C:\inetpub\group-manage\storage" /grant "IIS AppPool\group-manage:(OI)(CI)F" /T
+```
+
+#### 6. Configure web.config
+
+```powershell
+cd C:\inetpub\group-manage
+New-Item -Path "public\web.config" -ItemType "file"
+notepad "public\web.config"
+```
+
+Paste the following content:
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+  <system.webServer>
+    <defaultDocument>
+      <files>
+        <add value="index.php" />
+      </files>
+    </defaultDocument>
+    <rewrite>
+      <rules>
+        <rule name="Laravel" stopProcessing="true">
+          <match url=".*" ignoreCase="false" />
+          <conditions>
+            <add input="{REQUEST_FILENAME}" matchType="IsFile" negate="true" />
+            <add input="{REQUEST_FILENAME}" matchType="IsDirectory" negate="true" />
+          </conditions>
+          <action type="Rewrite" url="index.php" />
+        </rule>
+      </rules>
+    </rewrite>
+  </system.webServer>
+</configuration>
+```
+
+#### 7. Laravel Application Setup
+
+Update the `.env` file with the correct MySQL password, then run:
+
+```powershell
+cd C:\inetpub\group-manage
+
+composer install
+php artisan key:generate
+npm install
+npm run build
+
+# Remove the hot file
+Remove-Item public\hot -ErrorAction SilentlyContinue
+
+php artisan config:clear
+php artisan cache:clear
+php artisan route:clear
+php artisan view:clear
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+```
+
+#### 8. HTTPS Binding (Optional)
+
+```powershell
+# Create self-signed certificate
+$cert = New-SelfSignedCertificate -DnsName "group-manage.a3n4.com" -CertStoreLocation "cert:\LocalMachine\My"
+
+# Add HTTPS binding
+Import-Module WebAdministration
+New-WebBinding -Name "group-manage" -Protocol https -Port 443 -HostHeader "group-manage.a3n4.com"
+
+# Associate certificate
+New-Item -Path "IIS:\SslBindings\0.0.0.0!443!group-manage.a3n4.com" -Thumbprint $cert.Thumbprint -SslFlags 1
+```
+
+### Steps - Verification
+
+#### Server
+```powershell
+Get-Service MySQL
+Get-Service W3SVC
+```
+
+#### Client
+1. Open a browser and visit `http://group-manage.a3n4.com`.
+2. Register an account and create a project group.
+3. Visit `https://group-manage.a3n4.com` and proceed past the certificate warning.
 
 # Remote Desktop
+
 ## Function
-### Remote Desktop - Kantor Virtual
-**Filosofi**: Kadang kita butuh bekerja dari tempat lain, atau mengelola server tanpa harus berada di depannya. Remote Desktop memungkinkan kita "mengetik" di komputer lain seolah-olah kita sedang duduk di depan server itu sendiri.
-**Kenapa ini penting?** Dengan Remote Desktop, kamu bisa mengakses server dari mana saja, tanpa harus fisik berada di depan monitor server. Ini sangat berguna untuk admin yang perlu melakukan tugas pemeliharaan atau troubleshooting dari jarak jauh.
+### Remote Desktop - Virtual Office
 
-## Steps Create
-1. Masuk ke SConfig
-2. Pilih 7
-3. Pilih E untuk Enabled Remote Dekstop
-4. Pilih 1 untuk more secure
-5. Enter dan pilih 13
+### Philosophy
+Sometimes you need to work from another location or manage the server without being physically in front of it. Remote Desktop allows you to control the server as if you were sitting right in front of it.
 
-## Steps Remove
-1. Masuk ke SConfig
-2. Pilih 7
-3. Pilih D untuk Disable Remote Dekstop
-4. Enter dan pilih 13
+### Steps - Create
 
-## Steps Verification
-### Server
-1. Masuk ke Sconfig
-2. Pilih 7
-3. Pastikan statusnya Enabled
-4. Enter dan pilih 13
+1. Open **SConfig**.
+2. Select **7** (Remote Desktop).
+3. Select **E** to enable Remote Desktop.
+4. Select **1** (more secure).
+5. Press Enter, then select **13** to restart.
 
-### Client
-1. Login Client
-2. Buka Search bar atau win+r
-3. Cari Remote Dekstop Connection atau mstsc
-4. Pada Window Remote Dekstop
-5. Isi Nama Computer a3n4.com
-6. Pada jendela credential masukkan password user 
-7. Muncul Warning remote computer cannot be verified klik ok (Karna ini server buatan sendiri jadi aman)
+### Steps - Remove
+
+1. Open **SConfig**.
+2. Select **7** (Remote Desktop).
+3. Select **D** to disable Remote Desktop.
+4. Press Enter, then select **13** to restart.
+
+### Steps - Verification
+
+#### Server
+1. Open **SConfig**.
+2. Select **7**.
+3. Verify the status shows **Enabled**.
+4. Press Enter, then select **13**.
+
+#### Client
+1. Log in to the Client.
+2. Press `Win + R`, type `mstsc`, and press Enter.
+3. In the Remote Desktop Connection window, enter the computer name: `a3n4.com`.
+4. Click **Connect**.
+5. Enter the user credentials when prompted.
+6. Click **Yes** on the certificate warning (this is a self-built server, so it is safe).
 
 # ADFS
+
 ## Function
-## Steps Create
+### ADFS (Active Directory Federation Services) - External Security Gateway
+
+### Philosophy
+ADFS acts as a security gate that allows users from other organizations (e.g., business partners) to access resources in your network without creating new accounts for them. It enables secure collaboration between organizations.
+
+### Steps - Create
+
 ```Powershell
 Install-WindowsFeature ADFS-Federation -IncludeManagementTools
 
-Add-DnsServerResourceRecordA -Name "adfs" -ZoneName "a3n4.com" -Ipv4Address 192.168.56.10
+Add-DnsServerResourceRecordA -Name "adfs" -ZoneName "a3n4.com" -IPv4Address 172.18.18.180
 
 New-SelfSignedCertificate -DnsName "adfs.a3n4.com" -CertStoreLocation "cert:\LocalMachine\My"
 
@@ -565,50 +615,55 @@ Add-KdsRootKey -EffectiveTime ((Get-Date).AddDays(1))
 $pass = "2025" | ConvertTo-SecureString -AsPlainText -Force
 $cred = New-Object System.Management.Automation.PSCredential ("A3N4\administrator", $pass)
 Install-ADFSFarm -CertificateThumbprint "8A5421340313C07AA2017F76F55984BAC754C422" -FederationServiceName "adfs.a3n4.com" -FederationServiceDisplayName "A3N4 Federation Service" -ServiceAccountCredential $cred
-# Masukkan username akun dan password yang akan digunakan lalu klik ok
 
 Set-ADFSProperties -EnableIdpInitiatedSignOnPage $true
 
-### PLUS Identity
-New-AdfsWebTheme -Name "TemaBaru" -SourceName "Default"
-Set-AdfsWebTheme -TargetName "TemaBaru" -Illustration @{path="Z:\wall_a3n4.jpg"}
-Set-AdfsWebTheme -TargetName "TemaBaru" -Logo @{path="Z:\logo_a3n4.png"}
-Set-AdfsWebConfig -ActiveThemeName "TemaBaru"
+# Customize Theme
+New-AdfsWebTheme -Name "CustomTheme" -SourceName "Default"
+Set-AdfsWebTheme -TargetName "CustomTheme" -Illustration @{path="Z:\wall_a3n4.jpg"}
+Set-AdfsWebTheme -TargetName "CustomTheme" -Logo @{path="Z:\logo_a3n4.png"}
+Set-AdfsWebConfig -ActiveThemeName "CustomTheme"
 ```
 
-## Steps Remove
+### Steps - Remove
+
 ```Powershell
 Uninstall-ADFSFarm
 Get-ChildItem Cert:\LocalMachine\My | Where-Object {$_.Subject -like "*adfs*"} | Remove-Item
-Remove-DnsServerResourceRecord -Name "adfs" -ZoneName "a3n4.com" -RRType A
+Remove-DnsServerResourceRecord -Name "adfs" -ZoneName "a3n4.com" -RRType A -Force
 Remove-WindowsFeature ADFS-Federation -IncludeManagementTools
 ```
 
-## Steps Verification
-### Server
+### Steps - Verification
+
+#### Server
 ```Powershell
 Get-WindowsFeature -Name ADFS-Federation
 Get-Service ADFSSRV
 Get-DnsServerResourceRecord -ZoneName "a3n4.com" -Name "adfs"
 Get-ChildItem Cert:\LocalMachine\My\
 Get-ADFSProperties | Select-Object HostName, EnableIdpInitiatedSignonPage, HttpPort, HttpsPort, CertificateDuration
-
 ```
 
-### Client
-1. Login Client
-2. Pada Browser Masukkan https://adfs.a3n4.com/adfs/ls/IdpInitiatedSignOn.aspx
-3. Tampil "Your connection is not private"
-4. Pilih advance dan continue to the web
-5. Maka akan tampil halaman dari web adfs
-6. Klik Sign in untuk login
-7. Masukkan Username dan password lalu sign in
+#### Client
+1. Log in to the Client.
+2. Open a browser and visit: `https://adfs.a3n4.com/adfs/ls/IdpInitiatedSignOn.aspx`
+3. A "Your connection is not private" warning will appear.
+4. Click **Advanced** → **Continue to adfs.a3n4.com (unsafe)**.
+5. The ADFS login page will load.
+6. Click **Sign in** and enter your domain credentials.
 
 
-# Ethernet 2 Unproriety
+# Ethernet 2 Unpropriety
+
 ## Function
+### Ethernet 2 Unpropriety - Resolving Network Conflicts
 
-## Steps Create
+### Philosophy
+Sometimes you have more than one network adapter connected. To avoid confusion, you must set which adapter is primary and which is secondary.
+
+### Steps - Configure
+
 ```Powershell
 Set-DnsClientServerAddress -InterfaceAlias "Ethernet 2" -ResetServerAddresses
 Set-DnsClient -InterfaceAlias "Ethernet 2" -RegisterThisConnectionsAddress $false

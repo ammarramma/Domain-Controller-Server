@@ -1,350 +1,300 @@
-# Windows Server Infrastructure Guide — A3N4 (Explained Edition)
+# WINDOWS SERVER INFRASTRUCTURE GUIDE - A3N4
 
-Dokumen ini versi “manusia mikir”.  
-Setiap bagian bukan cuma command, tapi dijelaskan kenapa dan apa efeknya.  
-Kalau masih copy-paste tanpa ngerti, itu bukan salah dokumentasi.
+Dokumen ini sudah dirapikan dengan prinsip:
+- urutan logis (dari dasar → service)
+- command lengkap (tidak dipotong diam-diam)
+- penjelasan singkat tapi jelas (tidak ceramah kosong)
 
----
+Kalau masih gagal, itu bukan salah dokumentasi lagi.
 
-## 1. SCONFIG (IP SET)
-### Fungsi
-Menentukan identitas dasar server: hostname dan IP statis.
+====================================================================
 
-### Kenapa penting
-Server harus bisa ditemukan secara konsisten. DHCP di server itu ide buruk kecuali kamu suka debugging tanpa arah.
+SECTION: SCONFIG (IP SET)
 
-### Command
-```cmd
+TUJUAN:
+Menentukan identitas dasar server (hostname + static IP)
+
+COMMAND:
+cmd:
 SConfig
-```
-Penjelasan:
-Membuka menu konfigurasi cepat berbasis CLI untuk Windows Server Core.
 
-```powershell
+powershell:
 set-sconfig -autoLaunch $true
-```
-Penjelasan:
-Mengatur agar SConfig otomatis muncul setiap login. Berguna kalau kamu sering konfigurasi server minimal.
 
-### Langkah
-- Opsi 2 → ubah hostname → memberi identitas unik server
-- Opsi 3 → network:
-  - pilih interface
-  - set IP static:
-    IP: 192.168.56.10 → alamat tetap server
-    Subnet: default → menentukan jaringan lokal
-    Gateway: kosong → karena tidak keluar jaringan
-- Opsi 13 → restart agar perubahan diterapkan
+LANGKAH:
+- pilih 2 → ubah hostname
+- pilih 3 → network
+- pilih interface
+- pilih 1 → set IP
+- pilih S (static)
+- isi:
+  IP: 192.168.56.10
+  subnet: enter (default 255.255.255.0)
+  gateway: kosong
+- pilih 13 → restart
 
----
+====================================================================
 
-## 2. AD DS (ACTIVE DIRECTORY)
-### Fungsi
-Membuat sistem manajemen identitas terpusat.
+SECTION: AD DS
 
-### Kenapa penting
-Tanpa AD, setiap komputer hidup sendiri. Dengan AD, semua terkontrol.
+TUJUAN:
+Membuat domain controller dan sistem identitas
 
-### Command
-```powershell
-Install-WindowsFeature AD-Domain-Services -IncludeManagementTools
-```
-Penjelasan:
-Menginstall role Active Directory beserta tools manajemennya.
+INSTALL:
+powershell:
+Install-WindowsFeature -Name AD-Domain-Services -IncludeManagementTools
 
-```powershell
 Install-ADDSForest `
 -DomainName "A3N4.com" `
 -DomainNetBiosName "A3N4" `
 -SafeModeAdministratorPassword (ConvertTo-SecureString "Aclsdmin123" -AsPlainText -Force)
-```
-Penjelasan:
-- DomainName → nama domain utama
-- NetBIOS → nama pendek domain
-- SafeModePassword → password recovery AD
 
-### Verifikasi
-```powershell
+VERIFIKASI:
 Get-WindowsFeature AD-Domain-Services
-```
-Penjelasan:
-Memastikan role sudah terinstall.
-
-```powershell
 Get-Service NTDS
-```
-Penjelasan:
-Service utama AD, harus running.
-
-```powershell
 $env:USERDOMAIN
-```
-Penjelasan:
-Menunjukkan domain aktif.
 
----
+REMOVE:
+Uninstall-WindowsFeature AD-Domain-Services -IncludeManagementTools
 
-## 3. DHCP
-### Fungsi
-Memberikan IP otomatis ke client.
+====================================================================
 
-### Kenapa penting
-Manual IP itu buang waktu dan rawan konflik.
+SECTION: DHCP
 
-### Command
-```powershell
+INSTALL:
 Install-WindowsFeature DHCP -IncludeManagementTools
-```
-Penjelasan:
-Menginstall service DHCP.
 
-```powershell
 Add-DhcpServerInDC -DNSName "a3n4.com" -IpAddress 192.168.56.10
-```
-Penjelasan:
-Mendaftarkan DHCP ke Active Directory agar diizinkan berjalan.
 
-```powershell
 Add-DhcpServerV4Scope `
 -Name "Scope-a3n4" `
 -StartRange 192.168.56.11 `
 -EndRange 192.168.56.20 `
 -SubnetMask 255.255.255.0 `
 -State Active
-```
-Penjelasan:
-- Range → IP yang bisa dipinjam client
-- Subnet → batas jaringan
-- Active → langsung digunakan
 
-```powershell
 Set-DhcpServerV4OptionValue -ScopeId 192.168.56.0 -Router 192.168.56.1
-```
-Penjelasan:
-Menentukan gateway untuk client.
 
-```powershell
-Set-DhcpServerV4OptionValue -ScopeId 192.168.56.0 -DnsServer 192.168.56.10 -DnsDomain "a3n4.com"
-```
-Penjelasan:
-Memberikan DNS server ke client.
+Set-DhcpServerV4OptionValue -ScopeId 192.168.56.0 `
+-DnsServer 192.168.56.10 `
+-DnsDomain "a3n4.com"
 
-```powershell
-Set-DhcpServerV4Scope -ScopeId 192.168.56.0 -LeaseDuration ([TimeSpan]::FromDays(365))
-```
-Penjelasan:
-Durasi peminjaman IP.
+Set-DhcpServerV4Scope `
+-ScopeId 192.168.56.0 `
+-LeaseDuration ([TimeSpan]::FromDays(365))
 
----
+VERIFIKASI:
+Get-WindowsFeature DHCP
+Get-Service DHCPServer
+Get-DhcpServerV4OptionValue -ScopeId 192.168.56.0
+Get-DhcpServerInDC
+Get-DhcpServerV4ScopeStatistics -ScopeId 192.168.56.0
+Get-DhcpServerV4Lease -ScopeId 192.168.56.0
 
-## 4. DNS
-### Fungsi
-Menerjemahkan nama domain ke IP.
+REMOVE:
+Remove-DhcpServerV4Scope -ScopeId 192.168.56.0 -Force
+Remove-DhcpServerInDC -DNSName "a3n4.com" -IpAddress 192.168.56.10
+Uninstall-WindowsFeature DHCP -IncludeManagementTools
+Restart-Computer
 
-### Kenapa penting
-Tanpa DNS, user harus hafal IP. Itu bukan 1995.
+====================================================================
 
-### Command
-```powershell
-Install-WindowsFeature DNS -IncludeManagementTools
-```
-Penjelasan:
-Mengaktifkan layanan DNS.
+SECTION: DNS
 
-```powershell
-Add-DnsServerPrimaryZone -NetworkId "192.168.56.0/24"
-```
-Penjelasan:
-Membuat reverse lookup zone (IP → nama).
+INSTALL:
+Install-WindowsFeature -Name DNS -IncludeManagementTools
 
-```powershell
-Add-DnsServerResourceRecordPtr -Name "10" -ZoneName "56.168.192.in-addr.arpa" -PtrDomainName "www.a3n4.com"
-```
-Penjelasan:
-Menghubungkan IP ke nama domain.
+REVERSE ZONE:
+Add-DnsServerPrimaryZone `
+-NetworkId "192.168.56.0/24" `
+-ZoneFile "56.168.192.in-addr.arpa.dns"
 
-```powershell
-Add-DnsServerResourceRecordA -Name "www" -ZoneName "a3n4.com" -IPv4Address "192.168.56.10"
-```
-Penjelasan:
-Mapping nama ke IP.
+PTR:
+Add-DnsServerResourceRecordPtr `
+-Name "10" `
+-ZoneName "56.168.192.in-addr.arpa" `
+-PtrDomainName "www.a3n4.com"
 
----
+A RECORD:
+DnsCmd /recordAdd a3n4.com www A 192.168.56.10
 
-## 5. JOIN DOMAIN
-### Fungsi
-Menghubungkan client ke domain.
+Add-DnsServerResourceRecordA `
+-Name "www" `
+-ZoneName "a3n4.com" `
+-IPv4Address "192.168.56.10"
 
-### Kenapa penting
-Tanpa ini, client cuma “tamu”.
+VERIFIKASI:
+Get-DnsServerZone
+Get-DnsServerResourceRecord -ZoneName "a3n4.com"
+nslookup www.a3n4.com
+ping www.a3n4.com
 
-### Langkah
-```
-sysdm.cpl → change → domain → a3n4.com
-```
-Penjelasan:
-Mengubah keanggotaan komputer dari workgroup ke domain.
+REMOVE:
+Remove-DnsServerResourceRecord -Name "www" -ZoneName "a3n4.com" -RRType A -Force
+Remove-DnsServerResourceRecord -Name "10" -ZoneName "56.168.192.in-addr.arpa" -RRType PTR -Force
+Remove-DnsServerZone -Name "56.168.192.in-addr.arpa" -Force
+Remove-WindowsFeature -Name DNS -IncludeManagementTools
 
----
+====================================================================
 
-## 6. USER, GROUP, OU
-### Fungsi
-Manajemen user dan hak akses.
+SECTION: JOIN DOMAIN
 
-### Command
-```powershell
+LANGKAH:
+run:
+sysdm.cpl
+
+- change
+- pilih domain
+- isi: a3n4.com
+- login credential
+- restart
+
+VERIFIKASI:
+ipconfig
+ping a3n4.com
+
+====================================================================
+
+SECTION: USER, GROUP, OU
+
+OU:
 New-ADOrganizationalUnit -Name "a3n4_Staff" -Path "DC=a3n4,DC=com"
-```
-Penjelasan:
-Membuat struktur organisasi di AD.
 
-```powershell
-New-ADGroup -Name "HR_Staff" -GroupScope Global -GroupCategory Security
-```
-Penjelasan:
-Membuat group untuk hak akses.
+GROUP:
+New-ADGroup -Name "All_Staff" -GroupScope Global -GroupCategory Security -Path "OU=a3n4_Staff,DC=a3n4,DC=com"
+New-ADGroup -Name "Finance_Staff" -GroupScope Global -GroupCategory Security -Path "OU=a3n4_Staff,DC=a3n4,DC=com"
+New-ADGroup -Name "HR_Staff" -GroupScope Global -GroupCategory Security -Path "OU=a3n4_Staff,DC=a3n4,DC=com"
+New-ADGroup -Name "Marketing_Staff" -GroupScope Global -GroupCategory Security -Path "OU=a3n4_Staff,DC=a3n4,DC=com"
 
-```powershell
-New-ADUser -Name "Ammar" -SamAccountName "Ammar" -Enabled $true
-```
-Penjelasan:
-Membuat user baru.
+USER:
+New-ADUser -Name "Ammar" -GivenName "Ammar" -SamAccountName "Ammar" -UserPrincipalName "Ammar@a3n4.com" -Path "OU=a3n4_Staff,DC=a3n4,DC=com" -AccountPassword (ConvertTo-SecureString "##ammarTi2b" -AsPlainText -Force) -Enabled $true
 
-```powershell
-Add-ADGroupMember -Identity "HR_Staff" -Members "Ammar"
-```
-Penjelasan:
-Menambahkan user ke group.
+MEMBER:
+Add-ADGroupMember -Identity "All_Staff" -Members "Ammar"
 
----
+VERIFIKASI:
+Get-ADUser -Filter *
+Get-ADGroup -Filter *
+Get-ADGroupMember -Identity "All_Staff"
 
-## 7. IIS
-### Fungsi
-Menjalankan web server.
+====================================================================
 
-### Command
-```powershell
-Install-WindowsFeature Web-Server -IncludeManagementTools
-```
-Penjelasan:
-Menginstall IIS.
+SECTION: IIS
 
-```powershell
-New-Website -Name "a3n4web" -Port 80 -HostHeader "a3n4.com"
-```
-Penjelasan:
-Membuat website baru.
+Install-WindowsFeature -Name Web-Server -IncludeManagementTools
 
----
+New-Item -Path "C:\inetpub\a3n4web" -ItemType Directory
 
-## 8. DFS
-### Fungsi
-File sharing terpusat.
+New-Website `
+-Name "a3n4web" `
+-Port 80 `
+-IpAddress "*" `
+-HostHeader "a3n4.com" `
+-PhysicalPath "C:\inetpub\a3n4web"
 
-### Command
-```powershell
-Install-WindowsFeature Fs-Dfs-NameSpace
-```
-Penjelasan:
-Mengaktifkan DFS namespace.
+Copy-Item -Path "Z:\web_iis\*" -Destination "C:\inetpub\a3n4web"
 
-```powershell
-New-DfsnRoot -Path "\\a3n4.com\data_a3n4"
-```
-Penjelasan:
-Membuat root DFS.
+Install-WindowsFeature Web-Static-Content
 
----
+New-SelfSignedCertificate -DnsName "a3n4.com" -CertStoreLocation "cert:\LocalMachine\My"
 
-## 9. FSRM
-### Fungsi
-Mengatur limit storage.
+Import-Module WebAdministration
 
-### Command
-```powershell
+New-WebBinding -Name "a3n4web" -Protocol https -Port 443 -IpAddress "*" -HostHeader "a3n4.com"
+
+Get-Item "cert:\LocalMachine\My\<ThumbPrint>" | New-Item "IIS:SslBindings\0.0.0.0!443!a3n4.com"
+
+====================================================================
+
+SECTION: DFS
+
+Start-Service RemoteRegistry
+Set-Service RemoteRegistry -StartupType Automatic
+
+Install-WindowsFeature Fs-Dfs-NameSpace -IncludeManagementTools
+
+New-Item -Path "C:\DFSRoots\a3n4_shared" -ItemType Directory
+
+New-SmbShare -Name "DFSa3n4" -Path "C:\DFSRoots\a3n4_shared" -FullAccess "a3n4\Administrator"
+
+New-DfsnRoot -Type DomainV2 -Path "\\a3n4.com\data_a3n4" -TargetPath "\\SRV01\DFSa3n4"
+
+New-Item -ItemType Directory -Path "C:\Shared"
+
+New-SmbShare -Name "data_share" -Path "C:\Shared" -FullAccess "a3n4\Administrator"
+
+New-Item -ItemType Directory -Path "C:\Shared\AllStaff"
+New-Item -ItemType Directory -Path "C:\Shared\HRStaff"
+New-Item -ItemType Directory -Path "C:\Shared\MarketingStaff"
+New-Item -ItemType Directory -Path "C:\Shared\FinanceStaff"
+
+====================================================================
+
+SECTION: FSRM
+
+Install-WindowsFeature -Name FS-Resource-Manager -IncludeManagementTools
+
+Restart-Service SrmSvc
+
+New-FsrmQuotaTemplate -Name "250MB" -Description "Maksimum 250MB" -Size 250MB
+
 New-FsrmQuota -Path "C:\Shared\AllStaff" -Template "250MB"
-```
-Penjelasan:
-Membatasi ukuran folder.
 
----
+====================================================================
 
-## 10. REMOTE DESKTOP
-### Fungsi
-Akses server jarak jauh.
+SECTION: REMOTE DESKTOP
 
-### Penjelasan
-Mengaktifkan koneksi remote berbasis GUI ke server.
+SConfig → 7 → Enable → 1 → restart
 
----
+====================================================================
 
-## 11. ADFS
-### Fungsi
-Single Sign-On.
+SECTION: ADFS
 
-### Command
-```powershell
-Install-WindowsFeature ADFS-Federation
-```
-Penjelasan:
-Menginstall layanan federasi.
+Install-WindowsFeature ADFS-Federation -IncludeManagementTools
 
----
+Add-DnsServerResourceRecordA -Name "adfs" -ZoneName "a3n4.com" -Ipv4Address 192.168.56.10
 
-## 12. FTP
-### Fungsi
-Transfer file.
+New-SelfSignedCertificate -DnsName "adfs.a3n4.com" -CertStoreLocation "cert:\LocalMachine\My"
 
-### Command
-```powershell
-New-WebFtpSite -Name "A3N4FTP"
-```
-Penjelasan:
-Membuat FTP server.
+Add-KdsRootKey -EffectiveTime ((Get-Date).AddDays(1))
 
----
+====================================================================
 
-## 13. MAIL SERVER
-### Fungsi
-Mengelola email internal.
+SECTION: FTP
 
-### Command
-```powershell
-Add-DnsServerResourceRecordA -Name "mail"
-```
-Penjelasan:
-Mendaftarkan mail server di DNS.
+Install-WindowsFeature -Name Web-FTP-Server, Web-FTP-Service, Web-Mgmt-Service, Web-Server
 
----
+New-Item -Path "C:\FTPRoot" -ItemType Directory
 
-## 14. VPN
-### Fungsi
-Akses jaringan secara aman dari luar.
+Import-Module WebAdministration
 
-### Command
-```powershell
+New-WebFtpSite -Name "A3N4FTP" -PhysicalPath "C:\FTPRoot" -Port 21 -IPAddress "*"
+
+====================================================================
+
+SECTION: VPN
+
+Install-WindowsFeature -Name RemoteAccess -IncludeManagementTools
+
 Install-RemoteAccess -VpnType VPN
-```
-Penjelasan:
-Mengaktifkan VPN server.
 
----
+====================================================================
 
-## 15. NTP
-### Fungsi
-Sinkronisasi waktu.
+SECTION: NTP
 
-### Command
-```powershell
-w32tm /resync
-```
-Penjelasan:
-Memaksa sinkronisasi waktu dengan server referensi.
+w32tm /Config /ManualPeerList:"time.windows.com" /SyncFromFlags:Manual /Update
+w32tm /Resync
 
----
+====================================================================
 
-## Penutup
-Sekarang tiap command ada alasan.  
-Kalau masih bingung, berarti bukan dokumentasinya yang kurang.
+SECTION: MAIL (DNS ONLY CORE)
 
-```
+Add-DnsServerResourceRecordA -Name "mail" -ZoneName "a3n4.com" -IPv4Address "192.168.56.10"
+
+Add-DnsServerResourceRecordCName -Name "autodiscover" -HostNameAlias "mail.a3n4.com" -ZoneName "a3n4.com"
+
+Add-DnsServerResourceRecord -ZoneName "a3n4.com" -Name "@" -Txt -DescriptiveText "v=spf1 ip4:192.168.56.10 -all"
+
+====================================================================
+
+END OF DOCUMENT
